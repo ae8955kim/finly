@@ -1,0 +1,18 @@
+
+> my-project@0.1.0 dev /vercel/share/v0-project
+> next dev
+
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://100.64.75.233:3000
+- Environments: .env.development.local
+✓ Ready in 552ms
+- Experiments (use with caution):
+  · serverActions
+  ✓ transitionIndicator
+
+ GET / 200 in 398ms (next.js: 171ms, application-code: 227ms)
+ GET / 200 in 40ms (next.js: 4ms, application-code: 37ms)
+  Reload env: .env.development.local
+ GET / 200 in 220ms (next.js: 46ms, application-code: 173ms)
+ GET / 200 in 43ms (next.js: 4ms, application-code: 38ms)
