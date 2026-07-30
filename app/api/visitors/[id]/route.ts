@@ -22,10 +22,10 @@ function transformVisitor(v: any) {
 // GET /api/visitors/[id] - Fetch visitor by ID
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id
+    const { id } = await params
 
     if (!id) {
       return NextResponse.json({ error: 'ID가 제공되지 않았습니다.' }, { status: 400 })
@@ -53,10 +53,10 @@ export async function GET(
 // PATCH /api/visitors/[id] - Update visitor status (approve/exit/delete/restore)
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id
+    const { id } = await params
 
     if (!id) {
       return NextResponse.json({ error: 'ID가 제공되지 않았습니다.' }, { status: 400 })
@@ -132,10 +132,10 @@ export async function PATCH(
 // DELETE /api/visitors/[id] - Delete visitor (hard delete from database)
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id
+    const { id } = await params
 
     if (!id) {
       return NextResponse.json({ error: 'ID가 제공되지 않았습니다.' }, { status: 400 })
