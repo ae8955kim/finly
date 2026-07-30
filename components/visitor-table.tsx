@@ -66,6 +66,10 @@ export function VisitorTable({
   async function act(id: string, action: "approve" | "exit" | "delete" | "restore") {
     setPendingId(id)
     try {
+      if (!id) {
+        throw new Error("방문자 ID가 없습니다.")
+      }
+
       const res = await fetch(`/api/visitors/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -75,6 +79,7 @@ export function VisitorTable({
       // 네트워크 오류나 서버 오류 처리
       if (!res.ok) {
         let errorMessage = "처리에 실패했습니다."
+        
         try {
           const data = await res.json()
           errorMessage = data.error || errorMessage
@@ -82,27 +87,43 @@ export function VisitorTable({
           // JSON 파싱 실패 시 상태 코드로 기본 메시지 생성
           if (res.status === 404) {
             errorMessage = "요청한 정보를 찾을 수 없습니다."
-          } else if (res.status >= 500) {
-            errorMessage = "서버 오류가 발생했습니다."
           } else if (res.status === 400) {
             errorMessage = "잘못된 요청입니다."
+          } else if (res.status >= 500) {
+            errorMessage = "서버 오류가 발생했습니다."
           }
         }
+        
+        console.error("[v0] API error in visitor action:", { status: res.status, action, id, message: errorMessage })
         throw new Error(errorMessage)
       }
       
-      const data = await res.json()
+      try {
+        const data = await res.json()
+        if (!data.visitor) {
+          throw new Error("응답 데이터가 유효하지 않습니다.")
+        }
+      } catch (parseErr) {
+        console.error("[v0] Response parsing error:", parseErr)
+        throw new Error("응답 데이터를 처리할 수 없습니다.")
+      }
+
       const messages: Record<string, string> = {
         approve: "승인되어 입실 처리되었습니다.",
         exit: "퇴실 처리되었습니다.",
         delete: "목록에서 삭제되었습니다.",
         restore: "복구되었습니다.",
       }
+      
       toast.success(messages[action] || "처리되었습니다.")
-      onMutate()
+      
+      // 데이터 새로고침
+      if (typeof onMutate === "function") {
+        onMutate()
+      }
     } catch (err) {
-      console.error("[v0] Error in visitor action:", err)
       const errorMessage = err instanceof Error ? err.message : "오류가 발생했습니다."
+      console.error("[v0] Error in visitor action:", { error: err, errorMessage })
       toast.error(errorMessage)
     } finally {
       setPendingId(null)

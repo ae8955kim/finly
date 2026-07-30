@@ -5,11 +5,22 @@ import { createClient } from "@/lib/supabase/server"
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const body = await request.json().catch(() => null)
+
+    if (!id) {
+      return NextResponse.json({ error: "ID가 제공되지 않았습니다." }, { status: 400 })
+    }
+
+    let body
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json({ error: "잘못된 요청 형식입니다." }, { status: 400 })
+    }
+
     const action = body?.action
 
-    if (!action) {
-      return NextResponse.json({ error: "동작이 지정되지 않았습니다." }, { status: 400 })
+    if (!action || !["approve", "exit", "delete", "restore"].includes(action)) {
+      return NextResponse.json({ error: "유효하지 않은 동작입니다." }, { status: 400 })
     }
 
     const supabase = await createClient()
@@ -26,6 +37,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         .single()
 
       if (error) {
+        console.error("[v0] Error deleting visitor:", { id, error: error.message })
         return NextResponse.json({ error: "방문자를 찾을 수 없습니다." }, { status: 404 })
       }
 
@@ -45,6 +57,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         .single()
 
       if (error) {
+        console.error("[v0] Error restoring visitor:", { id, error: error.message })
         return NextResponse.json({ error: "방문자를 찾을 수 없습니다." }, { status: 404 })
       }
 
@@ -64,6 +77,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         .single()
 
       if (error) {
+        console.error("[v0] Error approving visitor:", { id, error: error.message })
         return NextResponse.json({ error: "방문자를 찾을 수 없습니다." }, { status: 404 })
       }
 
@@ -83,6 +97,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         .single()
 
       if (error) {
+        console.error("[v0] Error exiting visitor:", { id, error: error.message })
         return NextResponse.json({ error: "방문자를 찾을 수 없습니다." }, { status: 404 })
       }
 

@@ -12,25 +12,46 @@ import { VisitorTable } from "@/components/visitor-table"
 import { DeletedVisitorsTable } from "@/components/deleted-visitors-table"
 import type { Visitor } from "@/lib/types"
 
-const fetcher = (url: string) =>
-  fetch(url)
-    .then((res) => {
-      if (!res.ok) {
-        if (res.status === 404) {
-          throw new Error("요청한 데이터를 찾을 수 없습니다.")
-        } else if (res.status >= 500) {
-          throw new Error("서버 오류가 발생했습니다.")
-        }
-        throw new Error("데이터를 불러오지 못했습니다.")
+const fetcher = async (url: string) => {
+  try {
+    const res = await fetch(url)
+    
+    if (!res.ok) {
+      let errorMessage = "데이터를 불러오지 못했습니다."
+      
+      if (res.status === 404) {
+        errorMessage = "요청한 데이터를 찾을 수 없습니다."
+      } else if (res.status === 400) {
+        errorMessage = "잘못된 요청입니다."
+      } else if (res.status >= 500) {
+        errorMessage = "서버 오류가 발생했습니다."
       }
-      return res.json().catch(() => {
-        throw new Error("응답 데이터를 처리할 수 없습니다.")
-      })
-    })
-    .catch((err) => {
-      console.error("[v0] Fetcher error:", err)
-      throw err
-    })
+      
+      try {
+        const errData = await res.json()
+        if (errData.error) {
+          errorMessage = errData.error
+        }
+      } catch {
+        // JSON 파싱 실패 시 기본 메시지 사용
+      }
+      
+      console.error("[v0] API error:", { status: res.status, message: errorMessage, url })
+      throw new Error(errorMessage)
+    }
+    
+    try {
+      return await res.json()
+    } catch {
+      console.error("[v0] JSON parsing failed:", { url })
+      throw new Error("응답 데이터를 처리할 수 없습니다.")
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "네트워크 오류가 발생했습니다."
+    console.error("[v0] Fetcher error:", { message, url })
+    throw err
+  }
+}
 
 export function AdminDashboard() {
   const router = useRouter()
@@ -44,16 +65,29 @@ export function AdminDashboard() {
   const { data, error, isLoading, mutate } = useSWR<{ visitors: Visitor[] }>(
     "/api/visitors?updateNonExited=true",
     fetcher,
-    { refreshInterval: 5000 },
+    { 
+      refreshInterval: 5000,
+      shouldRetryOnError: true,
+      errorRetryCount: 2,
+      errorRetryInterval: 3000,
+      fallbackData: { visitors: [] },
+    },
   )
 
   // Fetch deleted visitors
   const { data: deletedData } = useSWR<{ visitors: Visitor[] }>(
     "/api/visitors?deleted=true",
     fetcher,
-    { refreshInterval: 5000 },
+    { 
+      refreshInterval: 5000,
+      shouldRetryOnError: true,
+      errorRetryCount: 2,
+      errorRetryInterval: 3000,
+      fallbackData: { visitors: [] },
+    },
   )
 
+  // 에러 발생 시에도 빈 배열로 처리
   const activeVisitors = (data?.visitors ?? []).filter((v) => v.status !== "deleted")
   const deletedVisitors = deletedData?.visitors ?? []
   
@@ -76,6 +110,11 @@ export function AdminDashboard() {
   // Export to Excel function
   function downloadExcel() {
     try {
+      if (!activeVisitors || activeVisitors.length === 0) {
+        toast.error("다운로드할 방문자 데이터가 없습니다.")
+        return
+      }
+
       // Get all visitors for the month
       const startDate = new Date(selectedDate)
       startDate.setDate(1)
@@ -84,19 +123,29 @@ export function AdminDashboard() {
       endDate.setDate(0)
 
       const monthVisitors = activeVisitors.filter((v) => {
-        const regDate = new Date(v.registeredAt)
-        return regDate >= startDate && regDate <= endDate
+        try {
+          const regDate = new Date(v.registeredAt)
+          return regDate >= startDate && regDate <= endDate
+        } catch {
+          console.error("[v0] Invalid date in visitor:", v.id)
+          return false
+        }
       })
+
+      if (monthVisitors.length === 0) {
+        toast.error("선택한 월의 방문자 데이터가 없습니다.")
+        return
+      }
 
       // Create CSV content
       const headers = ["이름", "소속", "작업층", "생년월일", "전화번호", "등록시간", "입실시간", "퇴실시간", "상태"]
       const rows = monthVisitors.map((v) => [
-        v.name,
-        v.company,
-        v.floor,
-        v.birth,
-        v.phone,
-        new Date(v.registeredAt).toLocaleString("ko-KR"),
+        v.name || "",
+        v.company || "",
+        v.floor || "",
+        v.birth || "",
+        v.phone || "",
+        v.registeredAt ? new Date(v.registeredAt).toLocaleString("ko-KR") : "-",
         v.enteredAt ? new Date(v.enteredAt).toLocaleString("ko-KR") : "-",
         v.exitedAt ? new Date(v.exitedAt).toLocaleString("ko-KR") : "-",
         v.status === "pending" ? "승인 대기" : v.status === "onsite" ? "재실 중" : "퀴실",
@@ -119,18 +168,30 @@ export function AdminDashboard() {
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
+      URL.revokeObjectURL(url)
 
       toast.success("엑셀 파일이 다운로드되었습니다.")
     } catch (err) {
-      toast.error("다운로드에 실패했습니다.")
-      console.error(err)
+      const message = err instanceof Error ? err.message : "다운로드에 실패했습니다."
+      toast.error(message)
+      console.error("[v0] Download error:", err)
     }
   }
 
   async function handleLogout() {
-    await fetch("/api/admin/login", { method: "DELETE" })
-    toast.success("로그아웃되었습니다.")
-    router.refresh()
+    try {
+      const res = await fetch("/api/admin/login", { method: "DELETE" })
+      
+      if (!res.ok) {
+        console.warn("[v0] Logout API returned non-ok status:", res.status)
+      }
+      
+      toast.success("로그아웃되었습니다.")
+      router.refresh()
+    } catch (err) {
+      console.error("[v0] Logout error:", err)
+      toast.error("로그아웃 중 오류가 발생했습니다.")
+    }
   }
 
   return (
@@ -203,7 +264,7 @@ export function AdminDashboard() {
 
             {error ? (
               <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-                데이터를 불러오지 못했습니다. 새로고침을 눌러 다시 시도해 주세요.
+                데이��를 불러오지 못했습니다. 새로고침을 눌러 다시 시도해 주세요.
               </div>
             ) : isLoading ? (
               <div className="rounded-xl border border-border py-16 text-center text-sm text-muted-foreground">

@@ -41,6 +41,10 @@ export function DeletedVisitorsTable({
   async function handleRestore(id: string) {
     setPendingId(id)
     try {
+      if (!id) {
+        throw new Error("방문자 ID가 없습니다.")
+      }
+
       const res = await fetch(`/api/visitors/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -50,6 +54,7 @@ export function DeletedVisitorsTable({
       // 네트워크 오류나 서버 오류 처리
       if (!res.ok) {
         let errorMessage = "복구에 실패했습니다."
+        
         try {
           const data = await res.json()
           errorMessage = data.error || errorMessage
@@ -57,21 +62,35 @@ export function DeletedVisitorsTable({
           // JSON 파싱 실패 시 상태 코드로 기본 메시지 생성
           if (res.status === 404) {
             errorMessage = "요청한 정보를 찾을 수 없습니다."
-          } else if (res.status >= 500) {
-            errorMessage = "서버 오류가 발생했습니다."
           } else if (res.status === 400) {
             errorMessage = "잘못된 요청입니다."
+          } else if (res.status >= 500) {
+            errorMessage = "서버 오류가 발생했습니다."
           }
         }
+        
+        console.error("[v0] API error in restore:", { status: res.status, id, message: errorMessage })
         throw new Error(errorMessage)
       }
       
-      await res.json()
+      try {
+        const data = await res.json()
+        if (!data.visitor) {
+          throw new Error("응답 데이터가 유효하지 않습니다.")
+        }
+      } catch (parseErr) {
+        console.error("[v0] Response parsing error:", parseErr)
+        throw new Error("응답 데이터를 처리할 수 없습니다.")
+      }
+
       toast.success("복구되었습니다.")
-      onMutate()
+      
+      if (typeof onMutate === "function") {
+        onMutate()
+      }
     } catch (err) {
-      console.error("[v0] Error restoring visitor:", err)
       const errorMessage = err instanceof Error ? err.message : "오류가 발생했습니다."
+      console.error("[v0] Error restoring visitor:", { error: err, errorMessage })
       toast.error(errorMessage)
     } finally {
       setPendingId(null)
