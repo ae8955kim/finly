@@ -76,7 +76,7 @@ export async function PATCH(
 
     if (action === 'approve') {
       updateData = {
-        status: 'pending',
+        status: 'onsite',
         entered_at: now,
       }
     } else if (action === 'exit') {
