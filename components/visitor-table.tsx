@@ -162,12 +162,12 @@ export function VisitorTable({
             const busy = pendingId === v.id
             return (
               <TableRow key={v.id}>
-                <TableCell className="font-medium">{v.name}</TableCell>
-                <TableCell className="text-muted-foreground">{v.company}</TableCell>
-                <TableCell className="text-muted-foreground">{v.floor}</TableCell>
-                <TableCell className="hidden text-muted-foreground md:table-cell">{v.birth}</TableCell>
+                <TableCell className="font-medium">{v.name ?? "-"}</TableCell>
+                <TableCell className="text-muted-foreground">{v.company ?? "-"}</TableCell>
+                <TableCell className="text-muted-foreground">{v.floor ?? "-"}</TableCell>
+                <TableCell className="hidden text-muted-foreground md:table-cell">{v.birth ?? "-"}</TableCell>
                 <TableCell className="hidden font-mono text-xs text-muted-foreground lg:table-cell">
-                  {v.phone}
+                  {v.phone ?? "-"}
                 </TableCell>
                 <TableCell className="text-center font-mono text-xs tabular-nums">
                   {v.isFromPreviousDay ? (

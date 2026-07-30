@@ -57,7 +57,7 @@ export function AdminDashboard() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
+    (new Date().toISOString() ?? "").split("T")[0]
   )
   const [expandDeleted, setExpandDeleted] = useState(false)
 
@@ -95,15 +95,15 @@ export function AdminDashboard() {
   const filtered = activeVisitors.filter((v) => {
     const query = searchQuery.toLowerCase()
     return (
-      v.name.toLowerCase().includes(query) ||
-      v.phone.includes(query) ||
-      v.company.toLowerCase().includes(query)
+      (v.name ?? "").toLowerCase().includes(query) ||
+      (v.phone ?? "").includes(query) ||
+      (v.company ?? "").toLowerCase().includes(query)
     )
   })
 
   // Filter by date for current visitors
   const visitors = filtered.filter((v) => {
-    const regDate = v.registeredAt.split("T")[0]
+    const regDate = (v.registeredAt ?? "").split("T")[0] || "-"
     return regDate === selectedDate
   })
 
@@ -124,7 +124,9 @@ export function AdminDashboard() {
 
       const monthVisitors = activeVisitors.filter((v) => {
         try {
-          const regDate = new Date(v.registeredAt)
+          const dateStr = v.registeredAt ?? ""
+          if (!dateStr) return false
+          const regDate = new Date(dateStr)
           return regDate >= startDate && regDate <= endDate
         } catch {
           console.error("[v0] Invalid date in visitor:", v.id)

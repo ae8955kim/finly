@@ -125,18 +125,18 @@ export function DeletedVisitorsTable({
             const busy = pendingId === v.id
             return (
               <TableRow key={v.id}>
-                <TableCell className="font-medium">{v.name}</TableCell>
-                <TableCell className="text-muted-foreground">{v.company}</TableCell>
-                <TableCell className="text-muted-foreground">{v.floor}</TableCell>
-                <TableCell className="hidden text-muted-foreground md:table-cell">{v.birth}</TableCell>
+                <TableCell className="font-medium">{v.name ?? "-"}</TableCell>
+                <TableCell className="text-muted-foreground">{v.company ?? "-"}</TableCell>
+                <TableCell className="text-muted-foreground">{v.floor ?? "-"}</TableCell>
+                <TableCell className="hidden text-muted-foreground md:table-cell">{v.birth ?? "-"}</TableCell>
                 <TableCell className="hidden font-mono text-xs text-muted-foreground lg:table-cell">
-                  {v.phone}
+                  {v.phone ?? "-"}
                 </TableCell>
                 <TableCell className="text-center text-sm text-muted-foreground">
-                  {formatDate(v.registeredAt)}
+                  {formatDate(v.registeredAt ?? null)}
                 </TableCell>
                 <TableCell className="text-center text-sm text-muted-foreground">
-                  {formatDate(v.deletedAt || null)}
+                  {formatDate(v.deletedAt ?? null)}
                 </TableCell>
                 <TableCell className="text-right">
                   <Button

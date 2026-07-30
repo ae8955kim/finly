@@ -76,7 +76,7 @@ export async function GET(request: Request) {
     if (updateNonExited) {
       console.log("[v0] Updating non-exited visitors from previous days")
       const now = new Date()
-      const today = now.toISOString().split("T")[0]
+      const today = (now.toISOString() ?? "").split("T")[0] || ""
 
       // Get all onsite visitors
       const { data: onsiteVisitors, error: fetchError } = await supabase
@@ -95,9 +95,10 @@ export async function GET(request: Request) {
 
       if (onsiteVisitors) {
         for (const visitor of onsiteVisitors) {
-          if (visitor.entered_at) {
-            const enteredDate = visitor.entered_at.split("T")[0]
-            if (enteredDate < today) {
+          const enteredAtStr = visitor.entered_at ?? ""
+          if (enteredAtStr) {
+            const enteredDate = (enteredAtStr ?? "").split("T")[0] || ""
+            if (enteredDate && today && enteredDate < today) {
               // Update to mark as non-exited from previous day
               await supabase
                 .from("visitors")

@@ -133,15 +133,15 @@ export function listDeletedVisitors(): Visitor[] {
 
 export function updateNonExitedVisitors(): void {
   const now = new Date()
-  const today = now.toISOString().split("T")[0]
+  const today = (now.toISOString() ?? "").split("T")[0] || ""
 
   store.forEach((v) => {
     // 입실했지만 퇴실하지 않은 방문자
     if (v.status === "onsite" && v.enteredAt) {
-      const enteredDate = v.enteredAt.split("T")[0]
+      const enteredDate = (v.enteredAt ?? "").split("T")[0] || ""
       
       // 입실 날짜가 오늘보다 이전이면 (전날 입실)
-      if (enteredDate < today) {
+      if (enteredDate && today && enteredDate < today) {
         v.exitedAt = `${enteredDate}T23:59:59Z` // 입실 날짜 자정에 "미퇴실" 표시
         v.isFromPreviousDay = true
       }
