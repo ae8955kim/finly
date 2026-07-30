@@ -3,7 +3,7 @@
 import { useState } from "react"
 import useSWR from "swr"
 import { toast } from "sonner"
-import { CheckCircle2, Clock, DoorOpen, Loader2, LogOut, MessageCircle } from "lucide-react"
+import { CheckCircle2, Clock, DoorOpen, Loader2, LogOut, MessageCircle, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -37,7 +37,12 @@ const fetcher = (url: string) =>
     return res.json()
   })
 
-export function VisitorStatusView({ visitorId }: { visitorId: string }) {
+interface VisitorStatusViewProps {
+  visitorId: string
+  onReset?: () => void
+}
+
+export function VisitorStatusView({ visitorId, onReset }: VisitorStatusViewProps) {
   const { data, mutate } = useSWR<StatusData>(`/api/visitors/${visitorId}/status`, fetcher, {
     refreshInterval: 4000,
   })
@@ -46,6 +51,16 @@ export function VisitorStatusView({ visitorId }: { visitorId: string }) {
   const [exiting, setExiting] = useState(false)
 
   const status = data?.status ?? "pending"
+
+  function handleReEntry() {
+    // localStorage에서 visitorId 제거
+    localStorage.removeItem("visitorId")
+    // 부모 컴포넌트에 재설정 요청
+    if (onReset) {
+      onReset()
+    }
+    toast.success("새로운 방문 등록을 시작합니다.")
+  }
 
   async function handleExit() {
     setExiting(true)
@@ -114,6 +129,18 @@ export function VisitorStatusView({ visitorId }: { visitorId: string }) {
             퇴실하기
           </Button>
         </div>
+      )}
+
+      {/* 퇴실 완료 후 재입실 버튼 */}
+      {status === "exited" && (
+        <Button
+          size="lg"
+          className="w-full"
+          onClick={handleReEntry}
+        >
+          <Plus className="size-4" />
+          재입실하기
+        </Button>
       )}
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>

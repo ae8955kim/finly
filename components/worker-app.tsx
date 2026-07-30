@@ -34,7 +34,12 @@ export function WorkerApp() {
   }
 
   if (visitorId) {
-    return <VisitorStatusView visitorId={visitorId} />
+    return (
+      <VisitorStatusView 
+        visitorId={visitorId} 
+        onReset={() => setVisitorId(null)}
+      />
+    )
   }
 
   return (
