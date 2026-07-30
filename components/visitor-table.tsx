@@ -98,9 +98,11 @@ export function VisitorTable({
         throw new Error(errorMessage)
       }
       
+      let responseData
       try {
-        const data = await res.json()
-        if (!data.visitor) {
+        responseData = await res.json()
+        if (!responseData.visitor) {
+          console.error("[v0] Invalid response data:", responseData)
           throw new Error("응답 데이터가 유효하지 않습니다.")
         }
       } catch (parseErr) {
@@ -116,6 +118,7 @@ export function VisitorTable({
       }
       
       toast.success(messages[action] || "처리되었습니다.")
+      console.log("[v0] Action completed successfully:", { action, visitorId: id, visitor: responseData.visitor })
       
       // 데이터 새로고침
       if (typeof onMutate === "function") {

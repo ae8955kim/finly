@@ -4,12 +4,12 @@ import { useState } from "react"
 import useSWR from "swr"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Building2, LogOut, RefreshCw, Search, X, ChevronDown, Download } from "lucide-react"
+import { VisitorTable } from "./visitor-table"
+import { DeletedVisitorsTable } from "./deleted-visitors-table"
+import { StatCards } from "./stat-cards"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { StatCards } from "@/components/stat-cards"
-import { VisitorTable } from "@/components/visitor-table"
-import { DeletedVisitorsTable } from "@/components/deleted-visitors-table"
+import { getLocalDateString, getTodayString } from "@/lib/utils"
 import type { Visitor } from "@/lib/types"
 
 const fetcher = async (url: string) => {
@@ -56,9 +56,7 @@ const fetcher = async (url: string) => {
 export function AdminDashboard() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedDate, setSelectedDate] = useState<string>(
-    (new Date().toISOString() ?? "").split("T")[0]
-  )
+  const [selectedDate, setSelectedDate] = useState<string>(getTodayString())
   const [expandDeleted, setExpandDeleted] = useState(false)
 
   // Fetch all visitors (non-deleted) - includes call to mark non-exited visitors
@@ -101,9 +99,9 @@ export function AdminDashboard() {
     )
   })
 
-  // Filter by date for current visitors
+  // Filter by date for current visitors (로컬 타임존으로 변환하여 필터링)
   const visitors = filtered.filter((v) => {
-    const regDate = (v.registeredAt ?? "").split("T")[0]
+    const regDate = getLocalDateString(v.registeredAt)
     return regDate === selectedDate
   })
 
@@ -276,7 +274,7 @@ export function AdminDashboard() {
               <>
                 <div className="flex items-center justify-between">
                   <h2 className="text-base font-semibold">
-                    {selectedDate === new Date().toISOString().split("T")[0] ? "오늘의 방문자" : "선택된 날짜의 방문자"}
+                    {selectedDate === getTodayString() ? "오늘의 방문자" : "선택된 날짜의 방문자"}
                   </h2>
                   <span className="text-xs text-muted-foreground">
                     {searchQuery ? `검색결과: ${visitors.length}명` : `총 ${visitors.length}명`}
