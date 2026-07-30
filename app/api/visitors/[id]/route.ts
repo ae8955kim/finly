@@ -71,22 +71,23 @@ export async function PATCH(
 
     const supabase = await createClient()
 
-    let updateData: any = {}
+    let updateData: Record<string, any> = {}
+    const now = new Date().toISOString()
 
     if (action === 'approve') {
       updateData = {
-        status: 'onsite',
-        entered_at: new Date().toISOString(),
+        status: 'pending',
+        entered_at: now,
       }
     } else if (action === 'exit') {
       updateData = {
         status: 'exited',
-        exited_at: new Date().toISOString(),
+        exited_at: now,
       }
     } else if (action === 'delete') {
       updateData = {
         status: 'deleted',
-        deleted_at: new Date().toISOString(),
+        deleted_at: now,
       }
     } else if (action === 'restore') {
       updateData = {
@@ -95,6 +96,8 @@ export async function PATCH(
       }
     }
 
+    console.log('[v0] PATCH Update Data:', { id, action, updateData })
+
     const { data, error } = await supabase
       .from('visitors')
       .update(updateData)
@@ -102,8 +105,20 @@ export async function PATCH(
       .select()
       .single()
 
-    if (error || !data) {
-      console.error(`[v0] Error performing ${action} action:`, { id, error: error?.message })
+    if (error) {
+      console.error('[v0] Supabase Update Error:', {
+        id,
+        action,
+        updateData,
+        errorMessage: error.message,
+        errorDetails: error.details,
+        errorCode: error.code,
+      })
+      return NextResponse.json({ success: false, error: `업데이트 실패: ${error.message}` }, { status: 400 })
+    }
+
+    if (!data) {
+      console.error('[v0] No data returned after update:', { id, action })
       return NextResponse.json({ success: false, error: '방문자를 찾을 수 없습니다.' }, { status: 404 })
     }
 
@@ -128,14 +143,21 @@ export async function DELETE(
 
     const supabase = await createClient()
 
+    console.log('[v0] DELETE attempting to delete visitor:', { id })
+
     const { error } = await supabase
       .from('visitors')
       .delete()
       .eq('id', id)
 
     if (error) {
-      console.error('[v0] Error deleting visitor:', { id, error: error.message })
-      return NextResponse.json({ success: false, error: '방문자를 찾을 수 없습니다.' }, { status: 404 })
+      console.error('[v0] Supabase Delete Error:', {
+        id,
+        errorMessage: error.message,
+        errorDetails: error.details,
+        errorCode: error.code,
+      })
+      return NextResponse.json({ success: false, error: `삭제 실패: ${error.message}` }, { status: 400 })
     }
 
     return NextResponse.json({ success: true, data: { id, message: '방문자가 삭제되었습니다.' } }, { status: 200 })
