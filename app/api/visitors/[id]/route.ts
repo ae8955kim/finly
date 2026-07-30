@@ -25,6 +25,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     const supabase = await createClient()
 
+    // Helper function to transform snake_case to camelCase
+    const transformVisitor = (v: any) => ({
+      id: v.id,
+      name: v.name,
+      floor: v.floor,
+      company: v.company,
+      birth: v.birth,
+      phone: v.phone,
+      status: v.status,
+      registeredAt: v.registered_at,
+      enteredAt: v.entered_at,
+      exitedAt: v.exited_at,
+      deletedAt: v.deleted_at,
+      isFromPreviousDay: v.is_from_previous_day,
+    })
+
     if (action === "delete") {
       const { data, error } = await supabase
         .from("visitors")
@@ -41,7 +57,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         return NextResponse.json({ error: "방문자를 찾을 수 없습니다." }, { status: 404 })
       }
 
-      return NextResponse.json({ visitor: data })
+      return NextResponse.json({ visitor: transformVisitor(data) })
     }
 
     if (action === "restore") {
@@ -61,7 +77,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         return NextResponse.json({ error: "방문자를 찾을 수 없습니다." }, { status: 404 })
       }
 
-      return NextResponse.json({ visitor: data })
+      return NextResponse.json({ visitor: transformVisitor(data) })
     }
 
     if (action === "approve") {
@@ -81,7 +97,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         return NextResponse.json({ error: "방문자를 찾을 수 없습니다." }, { status: 404 })
       }
 
-      return NextResponse.json({ visitor: data })
+      return NextResponse.json({ visitor: transformVisitor(data) })
     }
 
     if (action === "exit") {
@@ -101,7 +117,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         return NextResponse.json({ error: "방문자를 찾을 수 없습니다." }, { status: 404 })
       }
 
-      return NextResponse.json({ visitor: data })
+      return NextResponse.json({ visitor: transformVisitor(data) })
     }
 
     return NextResponse.json({ error: "잘못된 동작입니다." }, { status: 400 })

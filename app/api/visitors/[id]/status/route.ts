@@ -29,8 +29,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       floor: visitor.floor,
       company: visitor.company,
       status: visitor.status,
-      entered_at: visitor.entered_at,
-      exited_at: visitor.exited_at,
+      enteredAt: visitor.entered_at,
+      exitedAt: visitor.exited_at,
     })
   } catch (err) {
     if (err instanceof Error) {

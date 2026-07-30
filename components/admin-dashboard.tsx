@@ -103,7 +103,7 @@ export function AdminDashboard() {
 
   // Filter by date for current visitors
   const visitors = filtered.filter((v) => {
-    const regDate = (v.registeredAt ?? "").split("T")[0] || "-"
+    const regDate = (v.registeredAt ?? "").split("T")[0]
     return regDate === selectedDate
   })
 

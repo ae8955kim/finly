@@ -50,7 +50,23 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "퇴실 처리에 실패했습니다." }, { status: 500 })
     }
     
-    return NextResponse.json({ visitor: updated })
+    // Transform snake_case fields to camelCase
+    const transformedVisitor = {
+      id: updated.id,
+      name: updated.name,
+      floor: updated.floor,
+      company: updated.company,
+      birth: updated.birth,
+      phone: updated.phone,
+      status: updated.status,
+      registeredAt: updated.registered_at,
+      enteredAt: updated.entered_at,
+      exitedAt: updated.exited_at,
+      deletedAt: updated.deleted_at,
+      isFromPreviousDay: updated.is_from_previous_day,
+    }
+    
+    return NextResponse.json({ visitor: transformedVisitor })
   } catch (err) {
     if (err instanceof Error) {
       console.error("[v0] Error updating visitor exit status:", {

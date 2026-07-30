@@ -140,7 +140,24 @@ export async function GET(request: Request) {
       count: data?.length || 0,
       hasData: !!data,
     })
-    return NextResponse.json({ visitors: data || [] })
+
+    // Transform snake_case fields from Supabase to camelCase for frontend
+    const transformedVisitors = (data || []).map((v: any) => ({
+      id: v.id,
+      name: v.name,
+      floor: v.floor,
+      company: v.company,
+      birth: v.birth,
+      phone: v.phone,
+      status: v.status,
+      registeredAt: v.registered_at,
+      enteredAt: v.entered_at,
+      exitedAt: v.exited_at,
+      deletedAt: v.deleted_at,
+      isFromPreviousDay: v.is_from_previous_day,
+    }))
+
+    return NextResponse.json({ visitors: transformedVisitors })
   } catch (err) {
     if (err instanceof Error) {
       console.error("[v0] Error fetching visitors (exception):", {
