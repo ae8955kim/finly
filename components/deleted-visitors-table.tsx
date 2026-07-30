@@ -75,7 +75,7 @@ export function DeletedVisitorsTable({
       
       try {
         const data = await res.json()
-        if (!data.visitor) {
+        if (!data.success || !data.data) {
           throw new Error("응답 데이터가 유효하지 않습니다.")
         }
       } catch (parseErr) {

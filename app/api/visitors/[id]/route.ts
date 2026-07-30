@@ -104,12 +104,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         .select()
         .single()
 
-      if (error) {
-        console.error("[v0] Error deleting visitor:", { id, error: error.message })
-        return NextResponse.json({ error: "방문자를 찾을 수 없습니다." }, { status: 404 })
+      if (error || !data) {
+        console.error("[v0] Error marking visitor as deleted:", { id, error: error?.message })
+        return NextResponse.json({ success: false, error: "방문자를 찾을 수 없습니다." }, { status: 404 })
       }
 
-      return NextResponse.json({ visitor: transformVisitor(data) })
+      return NextResponse.json({ success: true, data: transformVisitor(data) }, { status: 200 })
     }
 
     if (action === "restore") {
@@ -124,12 +124,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         .select()
         .single()
 
-      if (error) {
-        console.error("[v0] Error restoring visitor:", { id, error: error.message })
-        return NextResponse.json({ error: "방문자를 찾을 수 없습니다." }, { status: 404 })
+      if (error || !data) {
+        console.error("[v0] Error restoring visitor:", { id, error: error?.message })
+        return NextResponse.json({ success: false, error: "방문자를 찾을 수 없습니다." }, { status: 404 })
       }
 
-      return NextResponse.json({ visitor: transformVisitor(data) })
+      return NextResponse.json({ success: true, data: transformVisitor(data) }, { status: 200 })
     }
 
     if (action === "approve") {
@@ -144,12 +144,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         .select()
         .single()
 
-      if (error) {
-        console.error("[v0] Error approving visitor:", { id, error: error.message })
-        return NextResponse.json({ error: "방문자를 찾을 수 없습니다." }, { status: 404 })
+      if (error || !data) {
+        console.error("[v0] Error approving visitor:", { id, error: error?.message })
+        return NextResponse.json({ success: false, error: "방문자를 찾을 수 없습니다." }, { status: 404 })
       }
 
-      return NextResponse.json({ visitor: transformVisitor(data) })
+      return NextResponse.json({ success: true, data: transformVisitor(data) }, { status: 200 })
     }
 
     if (action === "exit") {
@@ -164,12 +164,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         .select()
         .single()
 
-      if (error) {
-        console.error("[v0] Error exiting visitor:", { id, error: error.message })
-        return NextResponse.json({ error: "방문자를 찾을 수 없습니다." }, { status: 404 })
+      if (error || !data) {
+        console.error("[v0] Error exiting visitor:", { id, error: error?.message })
+        return NextResponse.json({ success: false, error: "방문자를 찾을 수 없습니다." }, { status: 404 })
       }
 
-      return NextResponse.json({ visitor: transformVisitor(data) })
+      return NextResponse.json({ success: true, data: transformVisitor(data) }, { status: 200 })
     }
 
     return NextResponse.json({ error: "잘못된 동작입니다." }, { status: 400 })
@@ -198,20 +198,18 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
     const supabase = await createClient()
 
-    // Delete the visitor from database
-    const { data, error } = await supabase
+    // Delete the visitor from database (hard delete)
+    const { error } = await supabase
       .from("visitors")
       .delete()
       .eq("id", id)
-      .select()
-      .single()
 
     if (error) {
       console.error("[v0] Error deleting visitor:", { id, error: error.message })
-      return NextResponse.json({ error: "방문자를 찾을 수 없습니다." }, { status: 404 })
+      return NextResponse.json({ success: false, error: "방문자를 찾을 수 없습니다." }, { status: 404 })
     }
 
-    return NextResponse.json({ success: true, message: "방문자가 삭제되었습니다." })
+    return NextResponse.json({ success: true, data: { id, message: "방문자가 삭제되었습니다." } }, { status: 200 })
   } catch (err) {
     if (err instanceof Error) {
       console.error("[v0] Error deleting visitor:", {
@@ -222,6 +220,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     } else {
       console.error("[v0] Error deleting visitor (unknown error):", err)
     }
-    return NextResponse.json({ error: "방문자 삭제에 실패했습니다." }, { status: 500 })
+    return NextResponse.json({ success: false, error: "방문자 삭제에 실패했습니다." }, { status: 500 })
   }
 }
