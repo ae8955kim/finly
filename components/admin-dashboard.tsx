@@ -13,10 +13,24 @@ import { DeletedVisitorsTable } from "@/components/deleted-visitors-table"
 import type { Visitor } from "@/lib/types"
 
 const fetcher = (url: string) =>
-  fetch(url).then((res) => {
-    if (!res.ok) throw new Error("데이터를 불러오지 못했습니다.")
-    return res.json()
-  })
+  fetch(url)
+    .then((res) => {
+      if (!res.ok) {
+        if (res.status === 404) {
+          throw new Error("요청한 데이터를 찾을 수 없습니다.")
+        } else if (res.status >= 500) {
+          throw new Error("서버 오류가 발생했습니다.")
+        }
+        throw new Error("데이터를 불러오지 못했습니다.")
+      }
+      return res.json().catch(() => {
+        throw new Error("응답 데이터를 처리할 수 없습니다.")
+      })
+    })
+    .catch((err) => {
+      console.error("[v0] Fetcher error:", err)
+      throw err
+    })
 
 export function AdminDashboard() {
   const router = useRouter()

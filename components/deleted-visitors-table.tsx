@@ -46,12 +46,33 @@ export function DeletedVisitorsTable({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "restore" }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "복구에 실패했습니다.")
+      
+      // 네트워크 오류나 서버 오류 처리
+      if (!res.ok) {
+        let errorMessage = "복구에 실패했습니다."
+        try {
+          const data = await res.json()
+          errorMessage = data.error || errorMessage
+        } catch {
+          // JSON 파싱 실패 시 상태 코드로 기본 메시지 생성
+          if (res.status === 404) {
+            errorMessage = "요청한 정보를 찾을 수 없습니다."
+          } else if (res.status >= 500) {
+            errorMessage = "서버 오류가 발생했습니다."
+          } else if (res.status === 400) {
+            errorMessage = "잘못된 요청입니다."
+          }
+        }
+        throw new Error(errorMessage)
+      }
+      
+      await res.json()
       toast.success("복구되었습니다.")
       onMutate()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "오류가 발생했습니다.")
+      console.error("[v0] Error restoring visitor:", err)
+      const errorMessage = err instanceof Error ? err.message : "오류가 발생했습니다."
+      toast.error(errorMessage)
     } finally {
       setPendingId(null)
     }
