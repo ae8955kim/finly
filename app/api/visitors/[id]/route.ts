@@ -114,6 +114,16 @@ export async function PATCH(
         errorDetails: error.details,
         errorCode: error.code,
       })
+      
+      // 테이블이 없는 경우 특별 처리
+      if (error.message.includes('no field') || error.message.includes('relation')) {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'Supabase 데이터베이스 테이블이 준비되지 않았습니다. 관리자에게 문의하세요.',
+          details: error.message 
+        }, { status: 500 })
+      }
+      
       return NextResponse.json({ success: false, error: `업데이트 실패: ${error.message}` }, { status: 400 })
     }
 
@@ -157,6 +167,16 @@ export async function DELETE(
         errorDetails: error.details,
         errorCode: error.code,
       })
+      
+      // 테이블이 없는 경우 특별 처리
+      if (error.message.includes('no field') || error.message.includes('relation')) {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'Supabase 데이터베이스 테이블이 준비되지 않았습니다. 관리자에게 문의하세요.',
+          details: error.message 
+        }, { status: 500 })
+      }
+      
       return NextResponse.json({ success: false, error: `삭제 실패: ${error.message}` }, { status: 400 })
     }
 

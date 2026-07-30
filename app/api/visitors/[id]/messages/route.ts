@@ -45,6 +45,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         details: messagesError.details,
         visitorId: id,
       })
+      
+      // 테이블이 없는 경우 특별 처리
+      if (messagesError.message.includes('no field') || messagesError.message.includes('relation')) {
+        return NextResponse.json({ error: "Supabase 데이터베이스 테이블이 준비되지 않았습니다. 관리자에게 문의하세요." }, { status: 500 })
+      }
+      
       return NextResponse.json({ error: "메시지를 불러오지 못했습니다." }, { status: 500 })
     }
 
@@ -135,6 +141,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         details: insertError.details,
         payload: messagePayload,
       })
+      
+      // 테이블이 없는 경우 특별 처리
+      if (insertError.message.includes('no field') || insertError.message.includes('relation')) {
+        return NextResponse.json({ error: "Supabase 데이터베이스 테이블이 준비되지 않았습니다. 관리자에게 문의하세요." }, { status: 500 })
+      }
+      
       return NextResponse.json({ error: `메시지 전송에 실패했습니다: ${insertError.message}` }, { status: 500 })
     }
 
