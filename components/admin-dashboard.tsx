@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import useSWR from "swr"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Building2, ChevronDown, Download, LogOut, RefreshCw, Search, X } from "lucide-react"
+import { Building2, ChevronDown, Download, LogOut, RefreshCw, Search, Users, UserCheck, X } from "lucide-react"
 import { VisitorTable } from "./visitor-table"
 import { DeletedVisitorsTable } from "./deleted-visitors-table"
 import { StatCards } from "./stat-cards"
@@ -59,6 +59,11 @@ export function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString())
   const [expandDeleted, setExpandDeleted] = useState(false)
+  const [showOnlyOnsite, setShowOnlyOnsite] = useState(false) // 재실 중만 보기 토글 상태
+
+  // 미래 날짜 여부 판단
+  const todayStr = getTodayString()
+  const isFutureDate = selectedDate > todayStr
 
   // 선택된 날짜가 '오늘'인지 감지하기 위한 Ref
   const isSelectedDateTodayRef = useRef(true)
@@ -143,96 +148,103 @@ export function AdminDashboard() {
   })
 
   // 2. 날짜별 필터링 및 표기 가공 로직
-  const visitors = filtered
-    .filter((v) => {
-      const regDate = getLocalDateString(v.registeredAt || v.registered_at)
-      const enteredDate = getLocalDateString(v.enteredAt || v.entered_at)
+  const processedVisitors = useMemo(() => {
+    // 미래 날짜 선택 시 빈 배열 반환
+    if (isFutureDate) return []
 
-      // 조건 A: 선택된 날짜에 등록된 인원
-      const isRegisteredOnSelectedDate = regDate === selectedDate
+    return filtered
+      .filter((v) => {
+        const regDate = getLocalDateString(v.registeredAt || v.registered_at)
+        const enteredDate = getLocalDateString(v.enteredAt || v.entered_at)
 
-      // 조건 B: 선택된 날짜 이전에 입실했으나, 아직 퇴실하지 않고 재실 중(onsite)인 인원
-      const isUnexitedFromPreviousDay =
-        v.status === "onsite" &&
-        enteredDate !== "" &&
-        enteredDate < selectedDate
+        // 조건 A: 선택된 날짜에 등록된 인원
+        const isRegisteredOnSelectedDate = regDate === selectedDate
 
-      // 조건 C: 선택된 날짜 이전에 입실했고 선택된 날짜 이후에 퇴실한 인원
-      const exitedDate = getLocalDateString(v.exitedAt || v.exited_at)
-      const isExitedAfterSelectedDate =
-        v.status === "exited" &&
-        enteredDate !== "" &&
-        enteredDate <= selectedDate &&
-        exitedDate > selectedDate
+        // 조건 B: 선택된 날짜 이전에 입실했으나, 아직 퇴실하지 않고 재실 중(onsite)인 인원
+        const isUnexitedFromPreviousDay =
+          v.status === "onsite" &&
+          enteredDate !== "" &&
+          enteredDate < selectedDate
 
-      return isRegisteredOnSelectedDate || isUnexitedFromPreviousDay || isExitedAfterSelectedDate
-    })
-    .map((v) => {
-      const enteredDate = getLocalDateString(v.enteredAt || v.entered_at)
-      const exitedDate = getLocalDateString(v.exitedAt || v.exited_at)
-      const rawEnteredAt = v.enteredAt || v.entered_at
-      const rawExitedAt = v.exitedAt || v.exited_at
+        // 조건 C: 선택된 날짜 이전에 입실했고 선택된 날짜 이후에 퇴실한 인원
+        const exitedDate = getLocalDateString(v.exitedAt || v.exited_at)
+        const isExitedAfterSelectedDate =
+          v.status === "exited" &&
+          enteredDate !== "" &&
+          enteredDate <= selectedDate &&
+          exitedDate > selectedDate
 
-      let displayEnteredAt = "-"
-      let displayExitedAt = "-"
+        return isRegisteredOnSelectedDate || isUnexitedFromPreviousDay || isExitedAfterSelectedDate
+      })
+      .map((v) => {
+        const enteredDate = getLocalDateString(v.enteredAt || v.entered_at)
+        const exitedDate = getLocalDateString(v.exitedAt || v.exited_at)
+        const rawEnteredAt = v.enteredAt || v.entered_at
+        const rawExitedAt = v.exitedAt || v.exited_at
 
-      // -------------------------------------------------------------
-      // 1. 입실 시간 표기 가공 (displayEnteredAt)
-      // -------------------------------------------------------------
-      if (rawEnteredAt) {
-        try {
-          const timeStr = new Date(rawEnteredAt).toLocaleTimeString("ko-KR", {
-            timeZone: "Asia/Seoul",
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-          })
+        let displayEnteredAt = "-"
+        let displayExitedAt = "-"
 
-          // 선택된 조회 날짜보다 '이전 날짜'에 입실한 상태로 현재 날짜 대시보드에 떠 있는 경우
-          if (enteredDate !== "" && enteredDate < selectedDate) {
-            displayEnteredAt = `[전날 입실] ${timeStr}`
-          } else {
-            displayEnteredAt = timeStr
-          }
-        } catch {
-          displayEnteredAt = rawEnteredAt
-        }
-      }
-
-      // -------------------------------------------------------------
-      // 2. 퇴실 시간 표기 가공 (displayExitedAt)
-      // -------------------------------------------------------------
-      if (v.status === "onsite") {
-        // 현재 조회 중인 날짜가 입실 날짜보다 뒤에 있다면 (과거 기록 조회 시 미퇴실인 경우)
-        if (enteredDate !== "" && enteredDate < selectedDate) {
-          displayExitedAt = "명일 인계"
-        } else {
-          displayExitedAt = "-"
-        }
-      } else if (v.status === "exited" && rawExitedAt) {
-        // 퇴실 완료된 사람 중, 선택된 날짜 당시에 아직 퇴실 안 했었다면 (다음날 퇴실함)
-        if (exitedDate !== "" && exitedDate > selectedDate) {
-          displayExitedAt = "명일 인계"
-        } else {
+        if (rawEnteredAt) {
           try {
-            displayExitedAt = new Date(rawExitedAt).toLocaleTimeString("ko-KR", {
+            const timeStr = new Date(rawEnteredAt).toLocaleTimeString("ko-KR", {
               timeZone: "Asia/Seoul",
               hour: "2-digit",
               minute: "2-digit",
               hour12: false,
             })
+
+            if (enteredDate !== "" && enteredDate < selectedDate) {
+              displayEnteredAt = `[전날 입실] ${timeStr}`
+            } else {
+              displayEnteredAt = timeStr
+            }
           } catch {
-            displayExitedAt = rawExitedAt
+            displayEnteredAt = rawEnteredAt
           }
         }
-      }
 
-      return {
-        ...v,
-        displayEnteredAt,
-        displayExitedAt,
-      }
-    })
+        if (v.status === "onsite") {
+          if (enteredDate !== "" && enteredDate < selectedDate) {
+            displayExitedAt = "명일 인계"
+          } else {
+            displayExitedAt = "-"
+          }
+        } else if (v.status === "exited" && rawExitedAt) {
+          if (exitedDate !== "" && exitedDate > selectedDate) {
+            displayExitedAt = "명일 인계"
+          } else {
+            try {
+              displayExitedAt = new Date(rawExitedAt).toLocaleTimeString("ko-KR", {
+                timeZone: "Asia/Seoul",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false,
+              })
+            } catch {
+              displayExitedAt = rawExitedAt
+            }
+          }
+        }
+
+        return {
+          ...v,
+          displayEnteredAt,
+          displayExitedAt,
+        }
+      })
+  }, [filtered, selectedDate, isFutureDate])
+
+  // 3. 재실 중 필터링 적용
+  const visitors = useMemo(() => {
+    if (showOnlyOnsite) {
+      return processedVisitors.filter((v) => v.status === "onsite")
+    }
+    return processedVisitors
+  }, [processedVisitors, showOnlyOnsite])
+
+  // 현재 날짜 조회 목록 기준 재실 중 인원 수
+  const onsiteCount = processedVisitors.filter((v) => v.status === "onsite").length
 
   // 엑셀 다운로드 기능
   function downloadExcel() {
@@ -351,29 +363,52 @@ export function AdminDashboard() {
                 />
               </div>
 
-              <div className="relative flex-1 md:max-w-sm">
-                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="이름, 전화번호, 회사명 검색..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-10"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    aria-label="검색 초기화"
-                  >
-                    <X className="size-4" />
-                  </button>
-                )}
-              </div>
+              <div className="flex flex-1 flex-wrap items-center justify-end gap-3 md:max-w-xl">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="이름, 전화번호, 회사명 검색..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 pr-10"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      aria-label="검색 초기화"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  )}
+                </div>
 
-              <Button variant="outline" size="sm" onClick={downloadExcel}>
-                <Download className="size-4" />
-                엑셀 다운로드
-              </Button>
+                {/* 재실 중만 보기 버튼 */}
+                <Button
+                  variant={showOnlyOnsite ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowOnlyOnsite((prev) => !prev)}
+                  className="gap-1.5 whitespace-nowrap"
+                  disabled={isFutureDate}
+                >
+                  {showOnlyOnsite ? (
+                    <>
+                      <Users className="size-4" />
+                      전체 보기
+                    </>
+                  ) : (
+                    <>
+                      <UserCheck className="size-4" />
+                      재실 중만 보기 ({onsiteCount})
+                    </>
+                  )}
+                </Button>
+
+                <Button variant="outline" size="sm" onClick={downloadExcel}>
+                  <Download className="size-4" />
+                  엑셀 다운로드
+                </Button>
+              </div>
             </div>
 
             {error ? (
@@ -384,11 +419,17 @@ export function AdminDashboard() {
               <div className="rounded-xl border border-border py-16 text-center text-sm text-muted-foreground">
                 불러오는 중...
               </div>
+            ) : isFutureDate ? (
+              <div className="rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
+                미래 날짜의 방문자 데이터는 존재하지 않습니다.
+              </div>
             ) : (
               <>
                 <div className="flex items-center justify-between">
                   <h2 className="text-base font-semibold">
-                    {selectedDate === getTodayString() ? "오늘의 방문자" : "선택된 날짜의 방문자"}
+                    {selectedDate === getTodayString()
+                      ? showOnlyOnsite ? "오늘의 재실 인원" : "오늘의 방문자"
+                      : showOnlyOnsite ? "선택된 날짜의 재실 인원" : "선택된 날짜의 방문자"}
                   </h2>
                   <span className="text-xs text-muted-foreground">
                     {searchQuery ? `검색결과: ${visitors.length}명` : `총 ${visitors.length}명`}
