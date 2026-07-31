@@ -15,8 +15,11 @@ const fetcher = (url: string) =>
     return res.json()
   })
 
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("ko-KR", {
+function formatTime(iso?: string) {
+  if (!iso) return ""
+  const date = new Date(iso)
+  if (isNaN(date.getTime())) return ""
+  return date.toLocaleTimeString("ko-KR", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
@@ -45,7 +48,9 @@ export function ChatPanel({
   const scrollRef = useRef<HTMLDivElement>(null)
   const [lastMessageCount, setLastMessageCount] = React.useState(0)
 
-  const messages = data?.messages ?? []
+  // API 응답 구조(data.messages 또는 data) 대응
+  const rawMessages = data?.messages || (Array.isArray(data) ? data : [])
+  const messages = rawMessages
 
   // Track new messages from other party
   React.useEffect(() => {
@@ -69,13 +74,18 @@ export function ChatPanel({
     if (!value || sending) return
 
     setSending(true)
-    // 낙관적 업데이트
-    const optimistic: ChatMessage = {
+
+    const now = new Date().toISOString()
+    // 낙관적 업데이트 - 모든 텍스트 키값 호환 처리
+    const optimistic: any = {
       id: `tmp-${Date.now()}`,
       visitor_id: visitorId,
       sender: viewpoint,
       text: value,
-      created_at: new Date().toISOString(),
+      content: value,
+      message: value,
+      created_at: now,
+      createdAt: now,
     }
     setText("")
     await mutate({ messages: [...messages, optimistic] }, { revalidate: false })
@@ -84,7 +94,7 @@ export function ChatPanel({
       const res = await fetch(`/api/visitors/${visitorId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: value, sender: viewpoint }),
+        body: JSON.stringify({ text: value, content: value, sender: viewpoint }),
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
@@ -110,22 +120,26 @@ export function ChatPanel({
                 : "아직 대화 내용이 없습니다."}
             </p>
           ) : (
-            messages.map((m) => {
+            messages.map((m: any, idx: number) => {
               const mine = m.sender === viewpoint
+              // ⭐ content, message, text 중 존재하는 텍스트 필드를 우선 렌더링! (글자 사라짐 방지)
+              const messageText = m.content || m.message || m.text || ""
+              const createdAt = m.created_at || m.createdAt
+
               return (
-                <div key={m.id} className={cn("flex flex-col gap-1", mine ? "items-end" : "items-start")}>
+                <div key={m.id || idx} className={cn("flex flex-col gap-1", mine ? "items-end" : "items-start")}>
                   <div
                     className={cn(
-                      "max-w-[80%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
+                      "max-w-[80%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words",
                       mine
                         ? "rounded-br-sm bg-primary text-primary-foreground"
                         : "rounded-bl-sm bg-muted text-foreground",
                     )}
                   >
-                    {m.text}
+                    {messageText}
                   </div>
                   <span className="px-1 text-[11px] tabular-nums text-muted-foreground">
-                    {m.sender === "admin" ? "관리자" : "공사자"} · {formatTime(m.created_at)}
+                    {m.sender === "admin" ? "관리자" : "공사자"} · {formatTime(createdAt)}
                   </span>
                 </div>
               )
