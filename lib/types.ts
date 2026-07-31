@@ -6,6 +6,8 @@ export interface ChatMessage {
   sender: ChatSender
   text: string
   created_at: string
+  is_read?: boolean
+  isRead?: boolean
 }
 
 export interface Visitor {
@@ -22,4 +24,10 @@ export interface Visitor {
   deleted_at: string | null
   is_from_previous_day: boolean
   created_at: string
+  memo?: string | null          // 👈 메모 속성 추가
+  
+  // 기존 코드와의 호환성을 위해 추가 (선택사항)
+  enteredAt?: string | null
+  exitedAt?: string | null
+  isFromPreviousDay?: boolean
 }

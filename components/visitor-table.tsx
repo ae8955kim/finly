@@ -29,7 +29,7 @@ type VisitorStatus = Visitor["status"]
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
-function formatTime(iso: string | null) {
+function formatTime(iso: string | null | undefined) {
   if (!iso) return "-"
   return new Date(iso).toLocaleTimeString("ko-KR", {
     hour: "2-digit",
@@ -57,7 +57,6 @@ const STATUS_META: Record<VisitorStatus, { label: string; className: string }> =
   },
 }
 
-// 방문자 행 컴포넌트 (3초 폴링 및 메모/채팅 기능 담당)
 function VisitorRow({
   visitor,
   busy,
@@ -75,7 +74,6 @@ function VisitorRow({
 }) {
   const meta = STATUS_META[visitor.status]
 
-  // 3초 주기로 백그라운드 메시지 감지
   const { data: msgData, mutate } = useSWR<{ messages: ChatMessage[] }>(
     `/api/visitors/${visitor.id}/messages`,
     fetcher,
@@ -93,8 +91,11 @@ function VisitorRow({
     }
   }, [isChatOpen, hasUnread, visitor.id, mutate])
 
-  // visitor 객체에 memo가 존재하는지 확인
-  const hasMemo = Boolean(visitor.memo && visitor.memo.trim().length > 0)
+  const memoValue = (visitor as any).memo
+  const hasMemo = Boolean(memoValue && memoValue.trim().length > 0)
+  const isPrevious = visitor.is_from_previous_day ?? (visitor as any).isFromPreviousDay
+  const enteredTime = visitor.entered_at ?? (visitor as any).enteredAt
+  const exitedTime = visitor.exited_at ?? (visitor as any).exitedAt
 
   return (
     <TableRow>
@@ -106,17 +107,17 @@ function VisitorRow({
         {visitor.phone ?? "-"}
       </TableCell>
       <TableCell className="text-center font-mono text-xs tabular-nums">
-        {visitor.isFromPreviousDay ? (
+        {isPrevious ? (
           <span className="font-medium text-chart-2">전 날 입실</span>
         ) : (
-          formatTime(visitor.enteredAt)
+          formatTime(enteredTime)
         )}
       </TableCell>
       <TableCell className="text-center font-mono text-xs tabular-nums">
-        {visitor.isFromPreviousDay ? (
+        {isPrevious ? (
           <span className="font-medium text-destructive">미퇴실</span>
         ) : (
-          formatTime(visitor.exitedAt)
+          formatTime(exitedTime)
         )}
       </TableCell>
       <TableCell className="text-center">
@@ -125,14 +126,13 @@ function VisitorRow({
         </Badge>
       </TableCell>
       
-      {/* 메모 버튼 추가 */}
       <TableCell className="text-center">
         <Button
           size="icon"
           variant="ghost"
           className="size-8 relative"
           onClick={() => onOpenMemo(visitor)}
-          title={hasMemo ? `메모: ${visitor.memo}` : "메모 작성"}
+          title={hasMemo ? `메모: ${memoValue}` : "메모 작성"}
         >
           <FileText className={`size-4 ${hasMemo ? "text-primary fill-primary/10" : "text-muted-foreground"}`} />
           {hasMemo && (
@@ -141,7 +141,6 @@ function VisitorRow({
         </Button>
       </TableCell>
 
-      {/* 문의(채팅) 버튼 */}
       <TableCell className="text-center">
         <div className="relative inline-block">
           <Button
@@ -230,18 +229,15 @@ export function VisitorTable({
   const [pendingId, setPendingId] = useState<string | null>(null)
   const [chatWith, setChatWith] = useState<Visitor | null>(null)
   
-  // 메모 상태 다이얼로그 관리를 위한 스테이트
   const [memoVisitor, setMemoVisitor] = useState<Visitor | null>(null)
   const [memoText, setMemoText] = useState("")
   const [savingMemo, setSavingMemo] = useState(false)
 
-  // 메모 다이얼로그 열기
   const handleOpenMemo = (visitor: Visitor) => {
     setMemoVisitor(visitor)
-    setMemoText(visitor.memo || "")
+    setMemoText((visitor as any).memo || "")
   }
 
-  // 메모 저장 API 호출
   const handleSaveMemo = async () => {
     if (!memoVisitor) return
     setSavingMemo(true)
@@ -352,7 +348,6 @@ export function VisitorTable({
         </Table>
       </div>
 
-      {/* 채팅 모달 */}
       <Dialog open={chatWith !== null} onOpenChange={(open) => !open && setChatWith(null)}>
         <DialogContent className="flex max-h-[80vh] flex-col gap-4 sm:max-w-md">
           <DialogHeader>
@@ -370,7 +365,6 @@ export function VisitorTable({
         </DialogContent>
       </Dialog>
 
-      {/* 메모 작성/수정 모달 */}
       <Dialog open={memoVisitor !== null} onOpenChange={(open) => !open && setMemoVisitor(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
