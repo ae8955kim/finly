@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import useSWR from "swr"
 import { toast } from "sonner"
 import { FileText, MessageCircle, Trash2 } from "lucide-react"
@@ -78,24 +78,40 @@ function VisitorRow({
 }) {
   const meta = STATUS_META[visitor.status] || STATUS_META.pending
 
+  // SWR: 채팅창이 열려있거나, 안 읽은 메시지가 있을 가능성이 있는 행만 폴링 주기를 짧게 가져가도록 세팅 가능
   const { data: msgData, mutate } = useSWR<{ messages: ChatMessage[] }>(
     `/api/visitors/${visitor.id}/messages`,
     fetcher,
-    { refreshInterval: 3000 }
+    { 
+      refreshInterval: isChatOpen ? 3000 : 8000, // 열려있지 않을 땐 요청 간격을 늘려 서버 부담 경감
+      revalidateOnFocus: true,
+    }
   )
 
-  const rawMessages = msgData?.messages || (Array.isArray(msgData) ? msgData : [])
-  const hasUnread = Array.isArray(rawMessages) && rawMessages.some((m: any) => m.sender === "worker" && !(m.isRead || m.is_read))
+  const rawMessages = msgData?.messages || (Array.isArray(msgData) ? (msgData as ChatMessage[]) : [])
+  const hasUnread = Array.isArray(rawMessages) && rawMessages.some((m) => {
+    const isWorker = m.sender === "worker"
+    const isRead = m.isRead ?? (m as any).is_read ?? false
+    return isWorker && !isRead
+  })
+
+  // 채팅창이 활성화되어 있고 안 읽은 메시지가 있을 때 읽음 처리 API 호출
+  const markAsRead = useCallback(async () => {
+    try {
+      await fetch(`/api/visitors/${visitor.id}/messages`, { method: "PATCH" })
+      mutate()
+    } catch (err) {
+      console.error("읽음 처리 실패:", err)
+    }
+  }, [visitor.id, mutate])
 
   useEffect(() => {
     if (isChatOpen && hasUnread) {
-      fetch(`/api/visitors/${visitor.id}/messages`, { method: "PATCH" })
-        .then(() => mutate())
-        .catch((err) => console.error("읽음 처리 실패:", err))
+      markAsRead()
     }
-  }, [isChatOpen, hasUnread, visitor.id, mutate])
+  }, [isChatOpen, hasUnread, markAsRead])
 
-  const memoValue = (visitor as any).memo
+  const memoValue = visitor.memo
   const hasMemo = Boolean(memoValue && String(memoValue).trim().length > 0)
   const isPrevious = visitor.is_from_previous_day ?? (visitor as any).isFromPreviousDay
   const enteredTime = visitor.entered_at ?? (visitor as any).enteredAt
@@ -130,21 +146,24 @@ function VisitorRow({
         </Badge>
       </TableCell>
       
+      {/* 메모 버튼 */}
       <TableCell className="text-center">
         <Button
           size="icon"
           variant="ghost"
-          className="size-8 relative"
+          className="relative size-8"
           onClick={() => onOpenMemo(visitor)}
           title={hasMemo ? `메모: ${memoValue}` : "메모 작성"}
+          aria-label={`${visitor.name ?? "방문자"} 메모 ${hasMemo ? "확인" : "작성"}`}
         >
-          <FileText className={`size-4 ${hasMemo ? "text-primary fill-primary/10" : "text-muted-foreground"}`} />
+          <FileText className={`size-4 ${hasMemo ? "fill-primary/10 text-primary" : "text-muted-foreground"}`} />
           {hasMemo && (
             <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-primary" />
           )}
         </Button>
       </TableCell>
 
+      {/* 문의 / 채팅 버튼 */}
       <TableCell className="text-center">
         <div className="relative inline-block">
           <Button
@@ -154,19 +173,20 @@ function VisitorRow({
             onClick={() => {
               onOpenChat(visitor)
               if (hasUnread) {
-                fetch(`/api/visitors/${visitor.id}/messages`, { method: "PATCH" }).then(() => mutate())
+                markAsRead()
               }
             }}
-            aria-label={`${visitor.name} 채팅 열기`}
+            aria-label={`${visitor.name ?? "방문자"} 채팅 열기`}
           >
             <MessageCircle className="size-4" />
           </Button>
           {hasUnread && (
-            <div className="absolute top-0 right-0 size-2.5 rounded-full bg-destructive animate-pulse" />
+            <span className="absolute top-0 right-0 size-2.5 animate-pulse rounded-full bg-destructive" />
           )}
         </div>
       </TableCell>
 
+      {/* 상태 관리 액션 버튼 */}
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-2">
           {visitor.status === "pending" && (
@@ -179,7 +199,7 @@ function VisitorRow({
                 variant="ghost"
                 disabled={busy}
                 onClick={() => onAct(visitor.id, "delete")}
-                aria-label="목록 삭제"
+                aria-label={`${visitor.name ?? "방문자"} 항목 삭제`}
               >
                 <Trash2 className="size-4" />
               </Button>
@@ -200,7 +220,7 @@ function VisitorRow({
                 variant="ghost"
                 disabled={busy}
                 onClick={() => onAct(visitor.id, "delete")}
-                aria-label="목록 삭제"
+                aria-label={`${visitor.name ?? "방문자"} 항목 삭제`}
               >
                 <Trash2 className="size-4" />
               </Button>
@@ -212,7 +232,7 @@ function VisitorRow({
               variant="ghost"
               disabled={busy}
               onClick={() => onAct(visitor.id, "delete")}
-              aria-label="목록 삭제"
+              aria-label={`${visitor.name ?? "방문자"} 항목 삭제`}
             >
               <Trash2 className="size-4" />
             </Button>
@@ -239,7 +259,7 @@ export function VisitorTable({
 
   const handleOpenMemo = (visitor: Visitor) => {
     setMemoVisitor(visitor)
-    setMemoText((visitor as any).memo || "")
+    setMemoText(visitor.memo || (visitor as any).memo || "")
   }
 
   const handleSaveMemo = async () => {
@@ -352,6 +372,7 @@ export function VisitorTable({
         </Table>
       </div>
 
+      {/* 채팅 모달 */}
       <Dialog open={chatWith !== null} onOpenChange={(open) => !open && setChatWith(null)}>
         <DialogContent className="flex max-h-[80vh] flex-col gap-4 sm:max-w-md">
           <DialogHeader>
@@ -369,6 +390,7 @@ export function VisitorTable({
         </DialogContent>
       </Dialog>
 
+      {/* 메모 모달 */}
       <Dialog open={memoVisitor !== null} onOpenChange={(open) => !open && setMemoVisitor(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
