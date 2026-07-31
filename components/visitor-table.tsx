@@ -31,11 +31,15 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 function formatTime(iso: string | null | undefined) {
   if (!iso) return "-"
-  return new Date(iso).toLocaleTimeString("ko-KR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  })
+  try {
+    return new Date(iso).toLocaleTimeString("ko-KR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+  } catch {
+    return "-"
+  }
 }
 
 const STATUS_META: Record<VisitorStatus, { label: string; className: string }> = {
@@ -72,7 +76,7 @@ function VisitorRow({
   onOpenMemo: (visitor: Visitor) => void
   isChatOpen: boolean
 }) {
-  const meta = STATUS_META[visitor.status]
+  const meta = STATUS_META[visitor.status] || STATUS_META.pending
 
   const { data: msgData, mutate } = useSWR<{ messages: ChatMessage[] }>(
     `/api/visitors/${visitor.id}/messages`,
@@ -81,7 +85,7 @@ function VisitorRow({
   )
 
   const rawMessages = msgData?.messages || (Array.isArray(msgData) ? msgData : [])
-  const hasUnread = rawMessages.some((m: any) => m.sender === "worker" && !(m.isRead || m.is_read))
+  const hasUnread = Array.isArray(rawMessages) && rawMessages.some((m: any) => m.sender === "worker" && !(m.isRead || m.is_read))
 
   useEffect(() => {
     if (isChatOpen && hasUnread) {
@@ -92,7 +96,7 @@ function VisitorRow({
   }, [isChatOpen, hasUnread, visitor.id, mutate])
 
   const memoValue = (visitor as any).memo
-  const hasMemo = Boolean(memoValue && memoValue.trim().length > 0)
+  const hasMemo = Boolean(memoValue && String(memoValue).trim().length > 0)
   const isPrevious = visitor.is_from_previous_day ?? (visitor as any).isFromPreviousDay
   const enteredTime = visitor.entered_at ?? (visitor as any).enteredAt
   const exitedTime = visitor.exited_at ?? (visitor as any).exitedAt
@@ -305,7 +309,7 @@ export function VisitorTable({
     }
   }
 
-  if (visitors.length === 0) {
+  if (!Array.isArray(visitors) || visitors.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
         아직 등록된 방문자가 없습니다.

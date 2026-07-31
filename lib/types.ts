@@ -15,18 +15,18 @@ export interface Visitor {
   name: string
   floor: string
   company: string
-  birth: string
-  phone: string
+  birth?: string
+  phone?: string
   status: "pending" | "onsite" | "exited" | "deleted"
-  registered_at: string
-  entered_at: string | null
-  exited_at: string | null
-  deleted_at: string | null
-  is_from_previous_day: boolean
-  created_at: string
-  memo?: string | null          // 👈 메모 속성 추가
+  registered_at?: string
+  entered_at?: string | null
+  exited_at?: string | null
+  deleted_at?: string | null
+  is_from_previous_day?: boolean
+  created_at?: string
+  memo?: string | null
   
-  // 기존 코드와의 호환성을 위해 추가 (선택사항)
+  // 구버전 및 카멜케이스 호환용
   enteredAt?: string | null
   exitedAt?: string | null
   isFromPreviousDay?: boolean
