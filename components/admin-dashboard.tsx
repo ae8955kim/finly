@@ -100,13 +100,13 @@ export function AdminDashboard() {
     )
   })
 
-  // Filter by date for current visitors (로컬 타임존으로 변환하여 필터링)
+  // Filter by date for current visitors (한국 로컬 타임존 KST 기준 필터링)
   const visitors = filtered.filter((v) => {
-    const regDate = getLocalDateString(v.registeredAt)
+    const regDate = getLocalDateString(v.registeredAt || v.registered_at)
     return regDate === selectedDate
   })
 
-  // Export to Excel function
+  // Export to Excel function (KST 한국 시간 기준 날짜 처리)
   function downloadExcel() {
     try {
       if (!activeVisitors || activeVisitors.length === 0) {
@@ -114,23 +114,12 @@ export function AdminDashboard() {
         return
       }
 
-      // Get all visitors for the month
-      const startDate = new Date(selectedDate)
-      startDate.setDate(1)
-      const endDate = new Date(startDate)
-      endDate.setMonth(endDate.getMonth() + 1)
-      endDate.setDate(0)
+      // 선택된 날짜의 연/월 추출 (YYYY-MM)
+      const targetYearMonth = selectedDate.substring(0, 7) // "2026-08"
 
       const monthVisitors = activeVisitors.filter((v) => {
-        try {
-          const dateStr = v.registeredAt ?? ""
-          if (!dateStr) return false
-          const regDate = new Date(dateStr)
-          return regDate >= startDate && regDate <= endDate
-        } catch {
-          console.error("[v0] Invalid date in visitor:", v.id)
-          return false
-        }
+        const regDate = getLocalDateString(v.registeredAt || v.registered_at)
+        return regDate.startsWith(targetYearMonth)
       })
 
       if (monthVisitors.length === 0) {
@@ -139,17 +128,18 @@ export function AdminDashboard() {
       }
 
       // Create CSV content
-      const headers = ["이름", "소속", "작업층", "생년월일", "전화번호", "등록시간", "입실시간", "퇴실시간", "상태"]
+      const headers = ["이름", "소속", "작업층", "생년월일", "전화번호", "등록시간", "입실시간", "퇴실시간", "상태", "메모"]
       const rows = monthVisitors.map((v) => [
         v.name || "",
         v.company || "",
         v.floor || "",
         v.birth || "",
         v.phone || "",
-        v.registeredAt ? new Date(v.registeredAt).toLocaleString("ko-KR") : "-",
-        v.enteredAt ? new Date(v.enteredAt).toLocaleString("ko-KR") : "-",
-        v.exitedAt ? new Date(v.exitedAt).toLocaleString("ko-KR") : "-",
-        v.status === "pending" ? "승인 대기" : v.status === "onsite" ? "재실 중" : "퀴실",
+        v.registeredAt || v.registered_at ? new Date(v.registeredAt || v.registered_at!).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "-",
+        v.enteredAt || v.entered_at ? new Date(v.enteredAt || v.entered_at!).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "-",
+        v.exitedAt || v.exited_at ? new Date(v.exitedAt || v.exited_at!).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "-",
+        v.status === "pending" ? "승인 대기" : v.status === "onsite" ? "재실 중" : "퇴실",
+        v.memo || "",
       ])
 
       // Add BOM for UTF-8 encoding in Excel
@@ -161,9 +151,8 @@ export function AdminDashboard() {
       const link = document.createElement("a")
       const url = URL.createObjectURL(blob)
 
-      const monthYear = startDate.toLocaleString("ko-KR", { year: "numeric", month: "2-digit" }).replace(" ", "")
       link.setAttribute("href", url)
-      link.setAttribute("download", `방문자현황_${monthYear}.csv`)
+      link.setAttribute("download", `방문자현황_${targetYearMonth}.csv`)
       link.style.visibility = "hidden"
 
       document.body.appendChild(link)
@@ -221,7 +210,8 @@ export function AdminDashboard() {
         </header>
 
         <div className="flex flex-col gap-6">
-          <StatCards visitors={activeVisitors} />
+          {/* 상단 통계 카드 (선택된 한국 날짜 선택 기준 데이터 전달) */}
+          <StatCards visitors={visitors} activeVisitors={activeVisitors} selectedDate={selectedDate} />
 
           <section className="flex flex-col gap-4">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -265,7 +255,7 @@ export function AdminDashboard() {
 
             {error ? (
               <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-                데이��를 불러오지 못했습니다. 새로고침을 눌러 다시 시도해 주세요.
+                데이터를 불러오지 못했습니다. 새로고침을 눌러 다시 시도해 주세요.
               </div>
             ) : isLoading ? (
               <div className="rounded-xl border border-border py-16 text-center text-sm text-muted-foreground">
