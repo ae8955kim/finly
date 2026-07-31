@@ -142,31 +142,44 @@ export function AdminDashboard() {
     )
   })
 
-  // 2. 날짜별 필터링 (당일 등록자 OR 전날 입실 후 아직 미퇴실/재실 중인 인원)
+  // 2. 날짜별 필터링 및 표기 가공 로직
   const visitors = filtered
     .filter((v) => {
       const regDate = getLocalDateString(v.registeredAt || v.registered_at)
       const enteredDate = getLocalDateString(v.enteredAt || v.entered_at)
 
-      // 조건 A: 등록일이 선택된 날짜와 일치하는 경우
-      const isRegisteredToday = regDate === selectedDate
+      // 조건 A: 선택된 날짜에 등록된 인원
+      const isRegisteredOnSelectedDate = regDate === selectedDate
 
-      // 조건 B: 이전 날짜에 입실했으나 퇴실하지 않고 현재 재실 중(onsite)인 경우
+      // 조건 B: 선택된 날짜 이전에 입실했으나, 아직 퇴실하지 않고 재실 중(onsite)인 인원
       const isUnexitedFromPreviousDay =
         v.status === "onsite" &&
         enteredDate !== "" &&
         enteredDate < selectedDate
 
-      return isRegisteredToday || isUnexitedFromPreviousDay
+      // 조건 C: 선택된 날짜 이전에 입실했고 선택된 날짜 이후에 퇴실한 인원
+      const exitedDate = getLocalDateString(v.exitedAt || v.exited_at)
+      const isExitedAfterSelectedDate =
+        v.status === "exited" &&
+        enteredDate !== "" &&
+        enteredDate <= selectedDate &&
+        exitedDate > selectedDate
+
+      return isRegisteredOnSelectedDate || isUnexitedFromPreviousDay || isExitedAfterSelectedDate
     })
     .map((v) => {
-      // 3. 입실시간 문자열 변환 (전날 입실자 표기 처리)
       const enteredDate = getLocalDateString(v.enteredAt || v.entered_at)
+      const exitedDate = getLocalDateString(v.exitedAt || v.exited_at)
       const rawEnteredAt = v.enteredAt || v.entered_at
+      const rawExitedAt = v.exitedAt || v.exited_at
 
-      let displayEnteredAt = rawEnteredAt
+      let displayEnteredAt = "-"
+      let displayExitedAt = "-"
 
-      if (rawEnteredAt && enteredDate && enteredDate < selectedDate) {
+      // -------------------------------------------------------------
+      // 1. 입실 시간 표기 가공 (displayEnteredAt)
+      // -------------------------------------------------------------
+      if (rawEnteredAt) {
         try {
           const timeStr = new Date(rawEnteredAt).toLocaleTimeString("ko-KR", {
             timeZone: "Asia/Seoul",
@@ -174,15 +187,50 @@ export function AdminDashboard() {
             minute: "2-digit",
             hour12: false,
           })
-          displayEnteredAt = `[전날 입실] ${timeStr}`
+
+          // 선택된 조회 날짜보다 '이전 날짜'에 입실한 상태로 현재 날짜 대시보드에 떠 있는 경우
+          if (enteredDate !== "" && enteredDate < selectedDate) {
+            displayEnteredAt = `[전날 입실] ${timeStr}`
+          } else {
+            displayEnteredAt = timeStr
+          }
         } catch {
-          displayEnteredAt = `[전날 입실] ${rawEnteredAt}`
+          displayEnteredAt = rawEnteredAt
+        }
+      }
+
+      // -------------------------------------------------------------
+      // 2. 퇴실 시간 표기 가공 (displayExitedAt)
+      // -------------------------------------------------------------
+      if (v.status === "onsite") {
+        // 현재 조회 중인 날짜가 입실 날짜보다 뒤에 있다면 (과거 기록 조회 시 미퇴실인 경우)
+        if (enteredDate !== "" && enteredDate < selectedDate) {
+          displayExitedAt = "명일 인계"
+        } else {
+          displayExitedAt = "-"
+        }
+      } else if (v.status === "exited" && rawExitedAt) {
+        // 퇴실 완료된 사람 중, 선택된 날짜 당시에 아직 퇴실 안 했었다면 (다음날 퇴실함)
+        if (exitedDate !== "" && exitedDate > selectedDate) {
+          displayExitedAt = "명일 인계"
+        } else {
+          try {
+            displayExitedAt = new Date(rawExitedAt).toLocaleTimeString("ko-KR", {
+              timeZone: "Asia/Seoul",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            })
+          } catch {
+            displayExitedAt = rawExitedAt
+          }
         }
       }
 
       return {
         ...v,
-        displayEnteredAt, // VisitorTable에서 입실시간으로 보여줄 커스텀 문자열
+        displayEnteredAt,
+        displayExitedAt,
       }
     })
 
