@@ -141,20 +141,31 @@ export async function GET(request: Request) {
       hasData: !!data,
     })
 
-    // Transform snake_case fields from Supabase to camelCase for frontend
+    // Transform Supabase data with full fields (including memo & snake_case/camelCase compatibility)
     const transformedVisitors = (data || []).map((v: any) => ({
-      id: v.id,
+      id: String(v.id),
       name: v.name,
       floor: v.floor,
       company: v.company,
       birth: v.birth,
       phone: v.phone,
       status: v.status,
+      memo: v.memo || "", // 👈 메모 필드 추가!
+      
+      // camelCase 호환용
       registeredAt: v.registered_at,
       enteredAt: v.entered_at,
       exitedAt: v.exited_at,
       deletedAt: v.deleted_at,
       isFromPreviousDay: v.is_from_previous_day,
+
+      // snake_case 호환용
+      registered_at: v.registered_at,
+      entered_at: v.entered_at,
+      exited_at: v.exited_at,
+      deleted_at: v.deleted_at,
+      is_from_previous_day: v.is_from_previous_day,
+      created_at: v.created_at,
     }))
 
     return NextResponse.json({ visitors: transformedVisitors })
