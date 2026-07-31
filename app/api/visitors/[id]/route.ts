@@ -26,20 +26,21 @@ export async function GET(
 ) {
   try {
     const { id } = await params
+    const visitorId = parseInt(id, 10)
 
-    if (!id) {
-      return NextResponse.json({ error: 'ID가 제공되지 않았습니다.' }, { status: 400 })
+    if (isNaN(visitorId)) {
+      return NextResponse.json({ error: '유효하지 않은 ID 형식입니다.' }, { status: 400 })
     }
 
     const supabase = await createClient()
     const { data, error } = await supabase
       .from('visitors')
       .select('*')
-      .eq('id', id)
+      .eq('id', visitorId)
       .single()
 
     if (error || !data) {
-      console.error('[v0] Error fetching visitor:', { id, error: error?.message })
+      console.error('[v0] Error fetching visitor:', { id: visitorId, error: error?.message })
       return NextResponse.json({ error: '방문자를 찾을 수 없습니다.' }, { status: 404 })
     }
 
@@ -57,9 +58,10 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
+    const visitorId = parseInt(id, 10)
 
-    if (!id) {
-      return NextResponse.json({ error: 'ID가 제공되지 않았습니다.' }, { status: 400 })
+    if (isNaN(visitorId)) {
+      return NextResponse.json({ error: '유효하지 않은 ID 형식입니다.' }, { status: 400 })
     }
 
     const body = await request.json()
@@ -96,39 +98,27 @@ export async function PATCH(
       }
     }
 
-    console.log('[v0] PATCH Update Data:', { id, action, updateData })
+    console.log('[v0] PATCH Update Data:', { visitorId, action, updateData })
 
     const { data, error } = await supabase
       .from('visitors')
       .update(updateData)
-      .eq('id', id)
+      .eq('id', visitorId)
       .select()
       .single()
 
     if (error) {
       console.error('[v0] Supabase Update Error:', {
-        id,
+        visitorId,
         action,
         updateData,
         errorMessage: error.message,
-        errorDetails: error.details,
-        errorCode: error.code,
       })
-      
-      // 테이블이 없는 경우 특별 처리
-      if (error.message.includes('no field') || error.message.includes('relation')) {
-        return NextResponse.json({ 
-          success: false, 
-          error: 'Supabase 데이터베이스 테이블이 준비되지 않았습니다. 관리자에게 문의하세요.',
-          details: error.message 
-        }, { status: 500 })
-      }
       
       return NextResponse.json({ success: false, error: `업데이트 실패: ${error.message}` }, { status: 400 })
     }
 
     if (!data) {
-      console.error('[v0] No data returned after update:', { id, action })
       return NextResponse.json({ success: false, error: '방문자를 찾을 수 없습니다.' }, { status: 404 })
     }
 
@@ -146,41 +136,25 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
+    const visitorId = parseInt(id, 10)
 
-    if (!id) {
-      return NextResponse.json({ error: 'ID가 제공되지 않았습니다.' }, { status: 400 })
+    if (isNaN(visitorId)) {
+      return NextResponse.json({ error: '유효하지 않은 ID 형식입니다.' }, { status: 400 })
     }
 
     const supabase = await createClient()
 
-    console.log('[v0] DELETE attempting to delete visitor:', { id })
-
     const { error } = await supabase
       .from('visitors')
       .delete()
-      .eq('id', id)
+      .eq('id', visitorId)
 
     if (error) {
-      console.error('[v0] Supabase Delete Error:', {
-        id,
-        errorMessage: error.message,
-        errorDetails: error.details,
-        errorCode: error.code,
-      })
-      
-      // 테이블이 없는 경우 특별 처리
-      if (error.message.includes('no field') || error.message.includes('relation')) {
-        return NextResponse.json({ 
-          success: false, 
-          error: 'Supabase 데이터베이스 테이블이 준비되지 않았습니다. 관리자에게 문의하세요.',
-          details: error.message 
-        }, { status: 500 })
-      }
-      
+      console.error('[v0] Supabase Delete Error:', { visitorId, errorMessage: error.message })
       return NextResponse.json({ success: false, error: `삭제 실패: ${error.message}` }, { status: 400 })
     }
 
-    return NextResponse.json({ success: true, data: { id, message: '방문자가 삭제되었습니다.' } }, { status: 200 })
+    return NextResponse.json({ success: true, data: { id: visitorId, message: '방문자가 삭제되었습니다.' } }, { status: 200 })
   } catch (err) {
     console.error('[v0] DELETE /api/visitors/[id] error:', err)
     return NextResponse.json({ success: false, error: '방문자 삭제에 실패했습니다.' }, { status: 500 })
