@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-// Transform snake_case from Supabase to camelCase for frontend
+// DB의 snake_case 데이터를 프론트엔드용 camelCase 데이터로 변환
 function transformVisitor(v: any) {
   return {
     id: v.id,
@@ -11,6 +11,7 @@ function transformVisitor(v: any) {
     birth: v.birth,
     phone: v.phone,
     status: v.status,
+    memo: v.memo || '', // 관리자 메모 필드 추가
     registeredAt: v.registered_at,
     enteredAt: v.entered_at,
     exitedAt: v.exited_at,
@@ -19,7 +20,7 @@ function transformVisitor(v: any) {
   }
 }
 
-// GET /api/visitors/[id] - Fetch visitor by ID
+// 1. GET /api/visitors/[id] - 특정 방문자 정보 조회
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -51,7 +52,7 @@ export async function GET(
   }
 }
 
-// PATCH /api/visitors/[id] - Update visitor status (approve/exit/delete/restore)
+// 2. PATCH /api/visitors/[id] - 방문자 상태 변경 및 메모 추가 (approve/exit/delete/restore/memo)
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -65,9 +66,10 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { action } = body
+    const { action, memo } = body
 
-    if (!action || !['approve', 'exit', 'delete', 'restore'].includes(action)) {
+    // 허용된 action 체크 (memo 추가)
+    if (!action || !['approve', 'exit', 'delete', 'restore', 'memo'].includes(action)) {
       return NextResponse.json({ error: '유효하지 않은 동작입니다.' }, { status: 400 })
     }
 
@@ -96,6 +98,10 @@ export async function PATCH(
         status: 'exited',
         deleted_at: null,
       }
+    } else if (action === 'memo') {
+      updateData = {
+        memo: memo ?? '', // 전달받은 메모 텍스트 저장
+      }
     }
 
     console.log('[v0] PATCH Update Data:', { visitorId, action, updateData })
@@ -114,7 +120,6 @@ export async function PATCH(
         updateData,
         errorMessage: error.message,
       })
-      
       return NextResponse.json({ success: false, error: `업데이트 실패: ${error.message}` }, { status: 400 })
     }
 
@@ -129,7 +134,7 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/visitors/[id] - Delete visitor (hard delete from database)
+// 3. DELETE /api/visitors/[id] - 방문자 영구 삭제
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }

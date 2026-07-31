@@ -103,3 +103,32 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "메시지 전송에 실패했습니다." }, { status: 500 })
   }
 }
+// 3. 메시지 읽음 처리 (PATCH)
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params
+    const visitorId = parseInt(id, 10)
+    if (isNaN(visitorId)) {
+  return NextResponse.json({ error: "유효하지 않은 ID입니다." }, { status: 400 })
+}
+
+    const supabase = await createClient()
+
+    // 해당 방문자의 읽지 않은 메시지들을 읽음(is_read: true) 상태로 업데이트
+    const { error } = await supabase
+      .from("chat_messages")
+      .update({ is_read: true })
+      .eq("visitor_id", visitorId)
+      .eq("is_read", false)
+
+    if (error) {
+      console.error("[v0] Error updating message status:", error)
+      return NextResponse.json({ error: "읽음 처리에 실패했습니다." }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    console.error("[v0] Error in PATCH messages:", err)
+    return NextResponse.json({ error: "읽음 처리에 실패했습니다." }, { status: 500 })
+  }
+}
