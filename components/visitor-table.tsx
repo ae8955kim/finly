@@ -161,9 +161,9 @@ function VisitorRow({
         )}
       </TableCell>
 
-      {/* 퇴실 시간 란: 미퇴실 표기 없이 공란('-') 유지, 퇴실 완료 시 시각 표시 */}
+      {/* 퇴실 시간 란: 실제 퇴실(exited) 상태일 때만 퇴실 시간을 표시하고 그 외엔 '-' 유지 */}
       <TableCell className="text-center font-mono text-xs tabular-nums">
-        {formatTime(exitedTime)}
+        {visitor.status === "exited" ? formatTime(exitedTime) : "-"}
       </TableCell>
 
       <TableCell className="text-center">
