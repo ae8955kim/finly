@@ -6,30 +6,32 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * UTC 타임스탬프를 로컬 타임존의 날짜 문자열(YYYY-MM-DD)로 변환
- * DB에서는 UTC로 저장되지만, 사용자 로컬 시간으로 표시하기 위함
+ * UTC 타임스탬프 또는 Date 객체를 한국 표준시(KST) 기준 날짜 문자열(YYYY-MM-DD)로 변환
  */
-export function getLocalDateString(isoString: string | null | undefined): string {
+export function getLocalDateString(isoString: string | Date | null | undefined): string {
   if (!isoString) return ""
   try {
-    const date = new Date(isoString)
-    // 로컬 타임존으로 변환하여 YYYY-MM-DD 형식 반환
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    return `${year}-${month}-${day}`
+    const date = typeof isoString === "string" ? new Date(isoString) : isoString
+    
+    // 유효하지 않은 Date 객체 체크
+    if (isNaN(date.getTime())) return ""
+
+    // 서버/클라이언트 환경 모두에서 한국 시간(Asia/Seoul) 기준 YYYY-MM-DD 추출
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Seoul",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+    return formatter.format(date) // "YYYY-MM-DD"
   } catch {
     return ""
   }
 }
 
 /**
- * 현재 로컬 시간의 날짜 문자열(YYYY-MM-DD) 반환
+ * 현재 한국 시간(KST) 기준 오늘 날짜 문자열(YYYY-MM-DD) 반환
  */
 export function getTodayString(): string {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  return getLocalDateString(new Date())
 }
