@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import useSWR from "swr"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -60,7 +60,50 @@ export function AdminDashboard() {
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString())
   const [expandDeleted, setExpandDeleted] = useState(false)
 
-  // Fetch all visitors (non-deleted) - includes call to mark non-exited visitors
+  // 선택된 날짜가 '오늘'인지 감지하기 위한 Ref
+  const isSelectedDateTodayRef = useRef(true)
+
+  useEffect(() => {
+    isSelectedDateTodayRef.current = selectedDate === getTodayString()
+  }, [selectedDate])
+
+  // 자정(KST 00:00:00)에 대시보드 날짜 자동 넘김 및 데이터 갱신
+  useEffect(() => {
+    let timerId: NodeJS.Timeout
+
+    const scheduleMidnightUpdate = () => {
+      const now = new Date()
+      const kstOffset = 9 * 60 * 60 * 1000
+      const utc = now.getTime() + now.getTimezoneOffset() * 60000
+      const kstNow = new Date(utc + kstOffset)
+
+      const nextMidnightKST = new Date(kstNow)
+      nextMidnightKST.setHours(24, 0, 0, 50)
+
+      const msToMidnight = nextMidnightKST.getTime() - kstNow.getTime()
+
+      timerId = setTimeout(() => {
+        const newToday = getTodayString()
+
+        if (isSelectedDateTodayRef.current) {
+          setSelectedDate(newToday)
+        }
+
+        mutate()
+        router.refresh()
+
+        scheduleMidnightUpdate()
+      }, msToMidnight)
+    }
+
+    scheduleMidnightUpdate()
+
+    return () => {
+      if (timerId) clearTimeout(timerId)
+    }
+  }, [router])
+
+  // Fetch all visitors (non-deleted)
   const { data, error, isLoading, mutate } = useSWR<{ visitors: Visitor[] }>(
     "/api/visitors?updateNonExited=true",
     fetcher,
@@ -86,11 +129,10 @@ export function AdminDashboard() {
     },
   )
 
-  // 에러 발생 시에도 빈 배열로 처리
   const activeVisitors = (data?.visitors ?? []).filter((v) => v.status !== "deleted")
   const deletedVisitors = deletedData?.visitors ?? []
   
-  // Filter active visitors by search query
+  // 1. 검색어 필터링
   const filtered = activeVisitors.filter((v) => {
     const query = searchQuery.toLowerCase()
     return (
@@ -100,13 +142,51 @@ export function AdminDashboard() {
     )
   })
 
-  // Filter by date for current visitors (한국 로컬 타임존 KST 기준 필터링)
-  const visitors = filtered.filter((v) => {
-    const regDate = getLocalDateString(v.registeredAt || v.registered_at)
-    return regDate === selectedDate
-  })
+  // 2. 날짜별 필터링 (당일 등록자 OR 전날 입실 후 아직 미퇴실/재실 중인 인원)
+  const visitors = filtered
+    .filter((v) => {
+      const regDate = getLocalDateString(v.registeredAt || v.registered_at)
+      const enteredDate = getLocalDateString(v.enteredAt || v.entered_at)
 
-  // Export to Excel function (KST 한국 시간 기준 날짜 처리)
+      // 조건 A: 등록일이 선택된 날짜와 일치하는 경우
+      const isRegisteredToday = regDate === selectedDate
+
+      // 조건 B: 이전 날짜에 입실했으나 퇴실하지 않고 현재 재실 중(onsite)인 경우
+      const isUnexitedFromPreviousDay =
+        v.status === "onsite" &&
+        enteredDate !== "" &&
+        enteredDate < selectedDate
+
+      return isRegisteredToday || isUnexitedFromPreviousDay
+    })
+    .map((v) => {
+      // 3. 입실시간 문자열 변환 (전날 입실자 표기 처리)
+      const enteredDate = getLocalDateString(v.enteredAt || v.entered_at)
+      const rawEnteredAt = v.enteredAt || v.entered_at
+
+      let displayEnteredAt = rawEnteredAt
+
+      if (rawEnteredAt && enteredDate && enteredDate < selectedDate) {
+        try {
+          const timeStr = new Date(rawEnteredAt).toLocaleTimeString("ko-KR", {
+            timeZone: "Asia/Seoul",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          })
+          displayEnteredAt = `[전날 입실] ${timeStr}`
+        } catch {
+          displayEnteredAt = `[전날 입실] ${rawEnteredAt}`
+        }
+      }
+
+      return {
+        ...v,
+        displayEnteredAt, // VisitorTable에서 입실시간으로 보여줄 커스텀 문자열
+      }
+    })
+
+  // 엑셀 다운로드 기능
   function downloadExcel() {
     try {
       if (!activeVisitors || activeVisitors.length === 0) {
@@ -114,8 +194,7 @@ export function AdminDashboard() {
         return
       }
 
-      // 선택된 날짜의 연/월 추출 (YYYY-MM)
-      const targetYearMonth = selectedDate.substring(0, 7) // "2026-08"
+      const targetYearMonth = selectedDate.substring(0, 7)
 
       const monthVisitors = activeVisitors.filter((v) => {
         const regDate = getLocalDateString(v.registeredAt || v.registered_at)
@@ -127,7 +206,6 @@ export function AdminDashboard() {
         return
       }
 
-      // Create CSV content
       const headers = ["이름", "소속", "작업층", "생년월일", "전화번호", "등록시간", "입실시간", "퇴실시간", "상태", "메모"]
       const rows = monthVisitors.map((v) => [
         v.name || "",
@@ -142,11 +220,9 @@ export function AdminDashboard() {
         v.memo || "",
       ])
 
-      // Add BOM for UTF-8 encoding in Excel
       const BOM = "\uFEFF"
       const csv = BOM + [headers, ...rows].map((row) => row.map((cell) => `"${cell}"`).join(",")).join("\n")
 
-      // Create blob and download
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
       const link = document.createElement("a")
       const url = URL.createObjectURL(blob)
@@ -210,7 +286,6 @@ export function AdminDashboard() {
         </header>
 
         <div className="flex flex-col gap-6">
-          {/* 상단 통계 카드 (선택된 한국 날짜 선택 기준 데이터 전달) */}
           <StatCards visitors={visitors} activeVisitors={activeVisitors} selectedDate={selectedDate} />
 
           <section className="flex flex-col gap-4">
