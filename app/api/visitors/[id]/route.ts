@@ -3,15 +3,16 @@ import { createClient } from '@/lib/supabase/server'
 
 // DB의 snake_case 데이터를 프론트엔드용 camelCase 데이터로 변환
 function transformVisitor(v: any) {
+  if (!v) return null
   return {
-    id: v.id,
+    id: String(v.id),
     name: v.name,
     floor: v.floor,
     company: v.company,
     birth: v.birth,
     phone: v.phone,
     status: v.status,
-    memo: v.memo || '', // 관리자 메모 필드 추가
+    memo: v.memo ?? '', // 메모 필드
     registeredAt: v.registered_at,
     enteredAt: v.entered_at,
     exitedAt: v.exited_at,
@@ -27,21 +28,16 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const visitorId = parseInt(id, 10)
-
-    if (isNaN(visitorId)) {
-      return NextResponse.json({ error: '유효하지 않은 ID 형식입니다.' }, { status: 400 })
-    }
 
     const supabase = await createClient()
     const { data, error } = await supabase
       .from('visitors')
       .select('*')
-      .eq('id', visitorId)
+      .eq('id', id)
       .single()
 
     if (error || !data) {
-      console.error('[v0] Error fetching visitor:', { id: visitorId, error: error?.message })
+      console.error('[v0] Error fetching visitor:', { id, error: error?.message })
       return NextResponse.json({ error: '방문자를 찾을 수 없습니다.' }, { status: 404 })
     }
 
@@ -52,23 +48,16 @@ export async function GET(
   }
 }
 
-// 2. PATCH /api/visitors/[id] - 방문자 상태 변경 및 메모 추가 (approve/exit/delete/restore/memo)
+// 2. PATCH /api/visitors/[id] - 방문자 상태 변경 및 메모 추가
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params
-    const visitorId = parseInt(id, 10)
-
-    if (isNaN(visitorId)) {
-      return NextResponse.json({ error: '유효하지 않은 ID 형식입니다.' }, { status: 400 })
-    }
-
     const body = await request.json()
     const { action, memo } = body
 
-    // 허용된 action 체크 (memo 추가)
     if (!action || !['approve', 'exit', 'delete', 'restore', 'memo'].includes(action)) {
       return NextResponse.json({ error: '유효하지 않은 동작입니다.' }, { status: 400 })
     }
@@ -99,23 +88,24 @@ export async function PATCH(
         deleted_at: null,
       }
     } else if (action === 'memo') {
+      // 전달받은 memo가 null/undefined가 아니면 문자열로 저장
       updateData = {
-        memo: memo ?? '', // 전달받은 메모 텍스트 저장
+        memo: memo !== undefined && memo !== null ? String(memo) : '',
       }
     }
 
-    console.log('[v0] PATCH Update Data:', { visitorId, action, updateData })
+    console.log('[v0] PATCH Update Data:', { id, action, updateData })
 
     const { data, error } = await supabase
       .from('visitors')
       .update(updateData)
-      .eq('id', visitorId)
+      .eq('id', id)
       .select()
       .single()
 
     if (error) {
       console.error('[v0] Supabase Update Error:', {
-        visitorId,
+        id,
         action,
         updateData,
         errorMessage: error.message,
@@ -141,25 +131,20 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const visitorId = parseInt(id, 10)
-
-    if (isNaN(visitorId)) {
-      return NextResponse.json({ error: '유효하지 않은 ID 형식입니다.' }, { status: 400 })
-    }
 
     const supabase = await createClient()
 
     const { error } = await supabase
       .from('visitors')
       .delete()
-      .eq('id', visitorId)
+      .eq('id', id)
 
     if (error) {
-      console.error('[v0] Supabase Delete Error:', { visitorId, errorMessage: error.message })
+      console.error('[v0] Supabase Delete Error:', { id, errorMessage: error.message })
       return NextResponse.json({ success: false, error: `삭제 실패: ${error.message}` }, { status: 400 })
     }
 
-    return NextResponse.json({ success: true, data: { id: visitorId, message: '방문자가 삭제되었습니다.' } }, { status: 200 })
+    return NextResponse.json({ success: true, data: { id, message: '방문자가 삭제되었습니다.' } }, { status: 200 })
   } catch (err) {
     console.error('[v0] DELETE /api/visitors/[id] error:', err)
     return NextResponse.json({ success: false, error: '방문자 삭제에 실패했습니다.' }, { status: 500 })
