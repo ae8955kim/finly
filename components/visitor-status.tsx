@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import useSWR from "swr"
 import { toast } from "sonner"
 import { CheckCircle2, Clock, DoorOpen, Loader2, LogOut, MessageCircle, Plus } from "lucide-react"
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { ChatPanel } from "@/components/chat-panel"
 import { cn } from "@/lib/utils"
-import type { Visitor } from "@/lib/types"
+import type { Visitor, ChatMessage } from "@/lib/types"
 
 type Status = Visitor["status"]
 
@@ -46,16 +46,35 @@ export function VisitorStatusView({ visitorId, onReset }: VisitorStatusViewProps
   const { data, mutate } = useSWR<StatusData>(`/api/visitors/${visitorId}/status`, fetcher, {
     refreshInterval: 4000,
   })
+
+  // 3초 주기로 메시지 자동 감지 (버튼 클릭 안 해도 실시간 수신)
+  const { data: msgData, mutate: mutateMessages } = useSWR<{ messages: ChatMessage[] }>(
+    `/api/visitors/${visitorId}/messages`,
+    fetcher,
+    { refreshInterval: 3000 }
+  )
+
   const [chatOpen, setChatOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [exiting, setExiting] = useState(false)
 
   const status = data?.status ?? "pending"
 
+  // 관리자(admin)가 보낸 읽지 않은 메시지가 있는지 체크
+  const rawMessages = msgData?.messages || (Array.isArray(msgData) ? msgData : [])
+  const hasUnread = rawMessages.some((m: any) => m.sender === "admin" && !(m.isRead || m.is_read))
+
+  // 채팅창이 열렸거나 열려 있는 동안 자동으로 읽음 처리 (PATCH)
+  useEffect(() => {
+    if (chatOpen && hasUnread && visitorId) {
+      fetch(`/api/visitors/${visitorId}/messages`, { method: "PATCH" })
+        .then(() => mutateMessages())
+        .catch((err) => console.error("메시지 읽음 처리 실패:", err))
+    }
+  }, [chatOpen, hasUnread, visitorId, mutateMessages])
+
   function handleReEntry() {
-    // localStorage에서 visitorId 제거
     localStorage.removeItem("visitorId")
-    // 부모 컴포넌트에 재설정 요청
     if (onReset) {
       onReset()
     }
@@ -113,12 +132,28 @@ export function VisitorStatusView({ visitorId, onReset }: VisitorStatusViewProps
           <Button
             variant="outline"
             size="lg"
-            className="w-full"
-            onClick={() => setChatOpen((v) => !v)}
+            className="relative w-full"
+            onClick={() => {
+              setChatOpen((v) => !v)
+              if (hasUnread) {
+                fetch(`/api/visitors/${visitorId}/messages`, { method: "PATCH" }).then(() =>
+                  mutateMessages()
+                )
+              }
+            }}
           >
             <MessageCircle className="size-4" />
             {chatOpen ? "채팅 닫기" : "관리자 연결"}
+
+            {/* 관리자의 새 메시지가 있을 때 표시되는 빨간 알림 뱃지 */}
+            {hasUnread && (
+              <span className="absolute right-4 flex size-3">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive opacity-75"></span>
+                <span className="relative inline-flex size-3 rounded-full bg-destructive"></span>
+              </span>
+            )}
           </Button>
+
           <Button
             variant="destructive"
             size="lg"
@@ -133,11 +168,7 @@ export function VisitorStatusView({ visitorId, onReset }: VisitorStatusViewProps
 
       {/* 퇴실 완료 후 재입실 버튼 */}
       {status === "exited" && (
-        <Button
-          size="lg"
-          className="w-full"
-          onClick={handleReEntry}
-        >
+        <Button size="lg" className="w-full" onClick={handleReEntry}>
           <Plus className="size-4" />
           재입실하기
         </Button>
