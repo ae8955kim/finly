@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react"
 import useSWR from "swr"
 import { toast } from "sonner"
-import { MessageCircle, Trash2 } from "lucide-react"
+import { FileText, MessageCircle, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Table,
   TableBody,
@@ -19,6 +20,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog"
 import { ChatPanel } from "@/components/chat-panel"
 import type { Visitor, ChatMessage } from "@/lib/types"
@@ -55,23 +57,25 @@ const STATUS_META: Record<VisitorStatus, { label: string; className: string }> =
   },
 }
 
-// 각 방문자별로 3초마다 백그라운드 메시지 감지 및 읽음 처리 담당 컴포넌트
+// 방문자 행 컴포넌트 (3초 폴링 및 메모/채팅 기능 담당)
 function VisitorRow({
   visitor,
   busy,
   onAct,
   onOpenChat,
+  onOpenMemo,
   isChatOpen,
 }: {
   visitor: Visitor
   busy: boolean
   onAct: (id: string, action: "approve" | "exit" | "delete" | "restore") => void
   onOpenChat: (visitor: Visitor) => void
+  onOpenMemo: (visitor: Visitor) => void
   isChatOpen: boolean
 }) {
   const meta = STATUS_META[visitor.status]
 
-  // 3초 주기로 백그라운드에서 실시간 메시지 데이터 감지
+  // 3초 주기로 백그라운드 메시지 감지
   const { data: msgData, mutate } = useSWR<{ messages: ChatMessage[] }>(
     `/api/visitors/${visitor.id}/messages`,
     fetcher,
@@ -79,11 +83,8 @@ function VisitorRow({
   )
 
   const rawMessages = msgData?.messages || (Array.isArray(msgData) ? msgData : [])
-
-  // 상대방(공사자)이 보낸 읽지 않은 메시지가 있는지 체크
   const hasUnread = rawMessages.some((m: any) => m.sender === "worker" && !(m.isRead || m.is_read))
 
-  // 대화창이 열렸을 때 자동으로 백엔드 읽음 처리(PATCH) 호출
   useEffect(() => {
     if (isChatOpen && hasUnread) {
       fetch(`/api/visitors/${visitor.id}/messages`, { method: "PATCH" })
@@ -91,6 +92,9 @@ function VisitorRow({
         .catch((err) => console.error("읽음 처리 실패:", err))
     }
   }, [isChatOpen, hasUnread, visitor.id, mutate])
+
+  // visitor 객체에 memo가 존재하는지 확인
+  const hasMemo = Boolean(visitor.memo && visitor.memo.trim().length > 0)
 
   return (
     <TableRow>
@@ -120,6 +124,24 @@ function VisitorRow({
           {meta.label}
         </Badge>
       </TableCell>
+      
+      {/* 메모 버튼 추가 */}
+      <TableCell className="text-center">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-8 relative"
+          onClick={() => onOpenMemo(visitor)}
+          title={hasMemo ? `메모: ${visitor.memo}` : "메모 작성"}
+        >
+          <FileText className={`size-4 ${hasMemo ? "text-primary fill-primary/10" : "text-muted-foreground"}`} />
+          {hasMemo && (
+            <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-primary" />
+          )}
+        </Button>
+      </TableCell>
+
+      {/* 문의(채팅) 버튼 */}
       <TableCell className="text-center">
         <div className="relative inline-block">
           <Button
@@ -128,22 +150,20 @@ function VisitorRow({
             className="size-8"
             onClick={() => {
               onOpenChat(visitor)
-              // 대화창 열 때 즉시 읽음 처리 수행
               if (hasUnread) {
                 fetch(`/api/visitors/${visitor.id}/messages`, { method: "PATCH" }).then(() => mutate())
               }
             }}
             aria-label={`${visitor.name} 채팅 열기`}
-            title="클릭 시 채팅창 열기 및 읽음 처리"
           >
             <MessageCircle className="size-4" />
           </Button>
-          {/* 새 메시지가 있으면 빨간 알림 뱃지 표시 */}
           {hasUnread && (
             <div className="absolute top-0 right-0 size-2.5 rounded-full bg-destructive animate-pulse" />
           )}
         </div>
       </TableCell>
+
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-2">
           {visitor.status === "pending" && (
@@ -209,20 +229,54 @@ export function VisitorTable({
 }) {
   const [pendingId, setPendingId] = useState<string | null>(null)
   const [chatWith, setChatWith] = useState<Visitor | null>(null)
+  
+  // 메모 상태 다이얼로그 관리를 위한 스테이트
+  const [memoVisitor, setMemoVisitor] = useState<Visitor | null>(null)
+  const [memoText, setMemoText] = useState("")
+  const [savingMemo, setSavingMemo] = useState(false)
+
+  // 메모 다이얼로그 열기
+  const handleOpenMemo = (visitor: Visitor) => {
+    setMemoVisitor(visitor)
+    setMemoText(visitor.memo || "")
+  }
+
+  // 메모 저장 API 호출
+  const handleSaveMemo = async () => {
+    if (!memoVisitor) return
+    setSavingMemo(true)
+    try {
+      const res = await fetch(`/api/visitors/${memoVisitor.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "memo", memo: memoText }),
+      })
+
+      if (!res.ok) throw new Error("메모 저장에 실패했습니다.")
+
+      toast.success("메모가 저장되었습니다.")
+      setMemoVisitor(null)
+      if (typeof onMutate === "function") {
+        onMutate()
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "오류가 발생했습니다.")
+    } finally {
+      setSavingMemo(false)
+    }
+  }
 
   async function act(id: string, action: "approve" | "exit" | "delete" | "restore") {
     setPendingId(id)
     try {
-      if (!id) {
-        throw new Error("방문자 ID가 없습니다.")
-      }
+      if (!id) throw new Error("방문자 ID가 없습니다.")
 
       const res = await fetch(`/api/visitors/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
       })
-
+      
       if (!res.ok) {
         let errorMessage = "처리에 실패했습니다."
         try {
@@ -236,20 +290,14 @@ export function VisitorTable({
         throw new Error(errorMessage)
       }
 
-      const responseData = await res.json()
-      if (!responseData.success || !responseData.data) {
-        throw new Error("응답 데이터가 유효하지 않습니다.")
-      }
-
       const messages: Record<string, string> = {
         approve: "승인되어 입실 처리되었습니다.",
         exit: "퇴실 처리되었습니다.",
         delete: "목록에서 삭제되었습니다.",
         restore: "복구되었습니다.",
       }
-
+      
       toast.success(messages[action] || "처리되었습니다.")
-
       if (typeof onMutate === "function") {
         onMutate()
       }
@@ -283,6 +331,7 @@ export function VisitorTable({
               <TableHead className="text-center">입실</TableHead>
               <TableHead className="text-center">퇴실</TableHead>
               <TableHead className="text-center">상태</TableHead>
+              <TableHead className="text-center">메모</TableHead>
               <TableHead className="text-center">문의</TableHead>
               <TableHead className="text-right">관리</TableHead>
             </TableRow>
@@ -295,6 +344,7 @@ export function VisitorTable({
                 busy={pendingId === v.id}
                 onAct={act}
                 onOpenChat={(visitor) => setChatWith(visitor)}
+                onOpenMemo={handleOpenMemo}
                 isChatOpen={chatWith?.id === v.id}
               />
             ))}
@@ -302,6 +352,7 @@ export function VisitorTable({
         </Table>
       </div>
 
+      {/* 채팅 모달 */}
       <Dialog open={chatWith !== null} onOpenChange={(open) => !open && setChatWith(null)}>
         <DialogContent className="flex max-h-[80vh] flex-col gap-4 sm:max-w-md">
           <DialogHeader>
@@ -310,12 +361,39 @@ export function VisitorTable({
             </DialogTitle>
           </DialogHeader>
           {chatWith && (
-            <ChatPanel
-              visitorId={chatWith.id}
-              viewpoint="admin"
+            <ChatPanel 
+              visitorId={chatWith.id} 
+              viewpoint="admin" 
               className="h-96"
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 메모 작성/수정 모달 */}
+      <Dialog open={memoVisitor !== null} onOpenChange={(open) => !open && setMemoVisitor(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {memoVisitor ? `${memoVisitor.name} (${memoVisitor.company}) 메모` : "관리자 메모"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <Textarea
+              placeholder="특이사항이나 전달받은 메모 내용을 입력하세요..."
+              value={memoText}
+              onChange={(e) => setMemoText(e.target.value)}
+              className="min-h-[120px]"
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setMemoVisitor(null)}>
+              취소
+            </Button>
+            <Button onClick={handleSaveMemo} disabled={savingMemo}>
+              {savingMemo ? "저장 중..." : "저장"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
