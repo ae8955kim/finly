@@ -29,6 +29,7 @@ type VisitorStatus = Visitor["status"]
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
+// 시간 포맷 헬퍼 함수
 function formatTime(iso: string | null | undefined) {
   if (!iso) return "-"
   try {
@@ -37,6 +38,30 @@ function formatTime(iso: string | null | undefined) {
       minute: "2-digit",
       hour12: false,
     })
+  } catch {
+    return "-"
+  }
+}
+
+// 입실 시간 포맷 (전날 입실 시 [YYYY.MM.DD HH:mm] 출력)
+function formatEnteredTime(iso: string | null | undefined, isPrevious: boolean) {
+  if (!iso) return "-"
+  try {
+    const d = new Date(iso)
+    const timeStr = d.toLocaleTimeString("ko-KR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+
+    if (isPrevious) {
+      const year = d.getFullYear()
+      const month = String(d.getMonth() + 1).padStart(2, "0")
+      const day = String(d.getDate()).padStart(2, "0")
+      return `[${year}.${month}.${day} ${timeStr}]`
+    }
+
+    return timeStr
   } catch {
     return "-"
   }
@@ -78,12 +103,11 @@ function VisitorRow({
 }) {
   const meta = STATUS_META[visitor.status] || STATUS_META.pending
 
-  // SWR: 채팅창이 열려있거나, 안 읽은 메시지가 있을 가능성이 있는 행만 폴링 주기를 짧게 가져가도록 세팅 가능
   const { data: msgData, mutate } = useSWR<{ messages: ChatMessage[] }>(
     `/api/visitors/${visitor.id}/messages`,
     fetcher,
     { 
-      refreshInterval: isChatOpen ? 3000 : 8000, // 열려있지 않을 땐 요청 간격을 늘려 서버 부담 경감
+      refreshInterval: isChatOpen ? 3000 : 8000,
       revalidateOnFocus: true,
     }
   )
@@ -95,7 +119,6 @@ function VisitorRow({
     return isWorker && !isRead
   })
 
-  // 채팅창이 활성화되어 있고 안 읽은 메시지가 있을 때 읽음 처리 API 호출
   const markAsRead = useCallback(async () => {
     try {
       await fetch(`/api/visitors/${visitor.id}/messages`, { method: "PATCH" })
@@ -126,20 +149,23 @@ function VisitorRow({
       <TableCell className="hidden font-mono text-xs text-muted-foreground lg:table-cell">
         {visitor.phone ?? "-"}
       </TableCell>
+      
+      {/* 입실 시간 란 */}
       <TableCell className="text-center font-mono text-xs tabular-nums">
         {isPrevious ? (
-          <span className="font-medium text-chart-2">전 날 입실</span>
+          <span className="font-medium text-chart-2">
+            {formatEnteredTime(enteredTime, true)}
+          </span>
         ) : (
-          formatTime(enteredTime)
+          formatEnteredTime(enteredTime, false)
         )}
       </TableCell>
+
+      {/* 퇴실 시간 란: 미퇴실 표기 없이 공란('-') 유지, 퇴실 완료 시 시각 표시 */}
       <TableCell className="text-center font-mono text-xs tabular-nums">
-        {isPrevious ? (
-          <span className="font-medium text-destructive">미퇴실</span>
-        ) : (
-          formatTime(exitedTime)
-        )}
+        {formatTime(exitedTime)}
       </TableCell>
+
       <TableCell className="text-center">
         <Badge variant="outline" className={meta.className}>
           {meta.label}
