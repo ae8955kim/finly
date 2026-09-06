@@ -110,7 +110,7 @@ export function ChatPanel({
   }
 
   return (
-    <div className={cn("flex flex-col overflow-hidden rounded-xl border border-border bg-card", className)}>
+    <div className={cn("flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-900 shadow-sm", className)}>
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         <div className="flex flex-col gap-3 p-4">
           {messages.length === 0 ? (
@@ -132,8 +132,8 @@ export function ChatPanel({
                     className={cn(
                       "max-w-[80%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words",
                       mine
-                        ? "rounded-br-sm bg-primary text-primary-foreground"
-                        : "rounded-bl-sm bg-muted text-foreground",
+                        ? "rounded-br-sm bg-blue-600 text-white"
+                        : "rounded-bl-sm border border-slate-200 bg-slate-100 text-slate-900",
                     )}
                   >
                     {messageText}
@@ -147,7 +147,7 @@ export function ChatPanel({
           )}
         </div>
       </div>
-      <form onSubmit={send} className="flex items-center gap-2 border-t border-border p-3">
+      <form onSubmit={send} className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 p-3">
         <Input
           value={text}
           onChange={(e) => setText(e.target.value)}

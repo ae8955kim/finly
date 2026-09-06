@@ -133,7 +133,16 @@ function VisitorRow({
         const messageText = (newMessage as any).content || newMessage.text || (newMessage as any).message || "새 메시지가 도착했습니다."
         toast.info(`${visitor.name} 공사자 메시지`, {
           description: messageText,
-          duration: 8000,
+          duration: 10000,
+          className: "border-2 border-blue-600 bg-white text-slate-950 shadow-xl",
+          descriptionClassName: "text-slate-700",
+          action: {
+            label: "채팅 열기",
+            onClick: () => {
+              onOpenChat(visitor)
+              markAsRead()
+            },
+          },
         })
       }
     }
@@ -396,7 +405,7 @@ export function VisitorTable({
               <TableHead className="hidden lg:table-cell">전화번호</TableHead>
               <TableHead className="text-center">입실</TableHead>
               <TableHead className="text-center">퇴실</TableHead>
-              <TableHead className="text-center">상태</TableHead>
+              <TableHead className="text-center">���태</TableHead>
               <TableHead className="text-center">메모</TableHead>
               <TableHead className="text-center">문의</TableHead>
               <TableHead className="text-right">관리</TableHead>
