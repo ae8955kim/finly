@@ -29,6 +29,18 @@ type VisitorStatus = Visitor["status"]
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
+// 오늘 날짜인지 확인하는 헬퍼 함수
+function isToday(isoDateString?: string | null) {
+  if (!isoDateString) return false
+  const date = new Date(isoDateString)
+  const today = new Date()
+  return (
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate()
+  )
+}
+
 // 시간 포맷 헬퍼 함수
 function formatTime(iso: string | null | undefined) {
   if (!iso) return "-"
@@ -313,6 +325,20 @@ export function VisitorTable({
   const [memoText, setMemoText] = useState("")
   const [savingMemo, setSavingMemo] = useState(false)
 
+  // 당일분만 남기는 필터링 (전날 명단 중 미퇴실자(onsite)나 전날 표시 플래그가 있는 경우 제외, 지나간 날짜의 퇴실/삭제 인원 자르기)
+  const filteredVisitors = (visitors || []).filter((v) => {
+    const isPreviousDay = v.is_from_previous_day ?? (v as any).isFromPreviousDay
+    const createdAt = (v as any).created_at || (v as any).createdAt || v.entered_at
+    
+    // 1. 이전 날부터 연속 재실 중인 인원이면 표시
+    if (isPreviousDay || v.status === "onsite") return true
+    // 2. 당일 생성되었거나 입실한 인원이면 표시
+    if (isToday(createdAt) || isToday(v.entered_at)) return true
+    
+    // 3. 그 외 어제 이전의 퇴실/삭제 데이터는 당일 목록에서 숨김
+    return false
+  })
+
   const handleOpenMemo = (visitor: Visitor) => {
     setMemoVisitor(visitor)
     setMemoText(visitor.memo || (visitor as any).memo || "")
@@ -347,18 +373,12 @@ export function VisitorTable({
     try {
       if (!id) throw new Error("방문자 ID가 없습니다.")
 
-      // 삭제인 경우 DELETE 메소드를 사용하여 완전히 제거함으로써 공사자가 초기화되도록 처리
-      const isDelete = action === "delete"
-      const url = `/api/visitors/${id}`
-      const options = isDelete
-        ? { method: "DELETE" }
-        : {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action }),
-          }
-
-      const res = await fetch(url, options)
+      // PATCH 방식으로 status를 'deleted'로 업데이트하여 '삭제된 인원' Tab/목록에서 조회 가능하게 유지
+      const res = await fetch(`/api/visitors/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      })
       
       if (!res.ok) {
         let errorMessage = "처리에 실패했습니다."
@@ -376,7 +396,7 @@ export function VisitorTable({
       const messages: Record<string, string> = {
         approve: "승인되어 입실 처리되었습니다.",
         exit: "퇴실 처리되었습니다.",
-        delete: "삭제되었습니다. 해당 공사자는 처음 화면에서 승인 대기 재신청이 가능합니다.",
+        delete: "삭제 처리되어 삭제된 인원 목록으로 이동했습니다.",
         restore: "복구되었습니다.",
       }
       
@@ -392,7 +412,7 @@ export function VisitorTable({
     }
   }
 
-  if (!Array.isArray(visitors) || visitors.length === 0) {
+  if (!Array.isArray(filteredVisitors) || filteredVisitors.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
         아직 등록된 방문자가 없습니다.
@@ -412,7 +432,6 @@ export function VisitorTable({
               <TableHead className="hidden lg:table-cell">전화번호</TableHead>
               <TableHead className="text-center">입실</TableHead>
               <TableHead className="text-center">퇴실</TableHead>
-              {/* 깨진 문자 정돈: '상태'로 수정 완료 */}
               <TableHead className="text-center">상태</TableHead>
               <TableHead className="text-center">메모</TableHead>
               <TableHead className="text-center">문의</TableHead>
@@ -420,7 +439,7 @@ export function VisitorTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {visitors.map((v) => (
+            {filteredVisitors.map((v) => (
               <VisitorRow
                 key={v.id}
                 visitor={v}
