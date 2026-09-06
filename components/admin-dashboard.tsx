@@ -346,7 +346,8 @@ export function AdminDashboard() {
         </header>
 
         <div className="flex flex-col gap-6">
-          <StatCards visitors={visitors} activeVisitors={activeVisitors} selectedDate={selectedDate} />
+          {/* StatCards에는 필터링 전 전체 데이터인 processedVisitors 전달 */}
+          <StatCards visitors={processedVisitors} activeVisitors={activeVisitors} selectedDate={selectedDate} />
 
           <section className="flex flex-col gap-4">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
