@@ -9,8 +9,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 })
     }
 
-    const { name, floor, company, birth, phone } = body
-    const fields = { name, floor, company, birth, phone }
+    const { name, floor, company, phone } = body
+    const fields = { name, floor, company, phone }
 
     for (const [key, value] of Object.entries(fields)) {
       if (typeof value !== "string" || value.trim() === "") {
@@ -26,7 +26,6 @@ export async function POST(request: Request) {
           name,
           floor,
           company,
-          birth,
           phone,
           status: "pending",
           registered_at: new Date().toISOString(),

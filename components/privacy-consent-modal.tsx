@@ -42,7 +42,6 @@ export function PrivacyConsentModal({
               <ul className="list-disc list-inside space-y-1 text-muted-foreground">
                 <li>이름</li>
                 <li>소속 (회사/부서명)</li>
-                <li>생년월일</li>
                 <li>전화번호</li>
                 <li>작업층</li>
               </ul>
