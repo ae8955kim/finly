@@ -8,7 +8,7 @@ export interface Visitor {
   name: string
   floor: string
   company: string
-  birth: string // YYYY-MM-DD
+  birth?: string // Deprecated: 생년월일은 더 이상 수집하지 않습니다.
   phone: string
   status: VisitorStatus
   registeredAt: string // ISO 등록 시각
@@ -57,7 +57,6 @@ export function addVisitor(input: {
   name: string
   floor: string
   company: string
-  birth: string
   phone: string
 }): Visitor {
   const visitor: Visitor = {
@@ -65,7 +64,6 @@ export function addVisitor(input: {
     name: input.name.trim(),
     floor: input.floor.trim(),
     company: input.company.trim(),
-    birth: input.birth.trim(),
     phone: input.phone.trim(),
     status: "pending",
     registeredAt: new Date().toISOString(),
