@@ -258,7 +258,7 @@ export function VisitorStatusView({ visitorId, onReset }: VisitorStatusViewProps
         </AlertDialog>
 
         <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-          <AlertDialogContent className="bg-white text-slate-900">
+          <AlertDialogContent className="border-2 border-slate-300 bg-white p-5 text-slate-950 shadow-2xl sm:max-w-md">
             <AlertDialogHeader>
               <AlertDialogTitle>퇴실하시겠습니까?</AlertDialogTitle>
               <AlertDialogDescription className="text-slate-500">
