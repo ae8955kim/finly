@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react"
 import useSWR from "swr"
 import { toast } from "sonner"
-import { Building2, MessageCircle, LogOut, Clock, CheckCircle2, ShieldAlert } from "lucide-react"
+import { Building2, MessageCircle, LogOut, Clock, CheckCircle2, ShieldAlert, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -71,7 +71,7 @@ export function VisitorStatusView({
   const enteredAt = visitor?.entered_at || visitor?.enteredAt
   const exitedAt = visitor?.exited_at || visitor?.exitedAt
 
-  // 3. 관리자 삭제 감지 시 자동으로 초기 화면(등록 폼)으로 전환
+  // 3. 관리자 삭제 감지 시 자동 초기화
   useEffect(() => {
     if (status === "deleted") {
       toast.info("관리자에 의해 신청 정보가 삭제되었습니다.")
@@ -84,13 +84,12 @@ export function VisitorStatusView({
     }
   }, [status, error, onReset])
 
-  // 4. 백그라운드 실시간 메시지 폴링 (팝업 감지 전용)
+  // 4. 독립 백그라운드 메시지 폴링 (팝업 감지)
   useEffect(() => {
     if (!visitorId) return
 
     const checkNewMessages = async () => {
       try {
-        // 메시지 API 호환성 처리 (주요 엔드포인트 수신)
         let res = await fetch(`/api/messages?visitorId=${visitorId}`)
         if (!res.ok) {
           res = await fetch(`/api/visitors/${visitorId}/messages`)
@@ -101,7 +100,6 @@ export function VisitorStatusView({
         const msgList = Array.isArray(data) ? data : data.messages || data.data || []
         if (!Array.isArray(msgList) || msgList.length === 0) return
 
-        // 관리자 메시지만 추출
         const adminMsgs = msgList.filter(
           (m: any) => m.sender === "admin" || m.sender_type === "admin" || m.isAdmin === true
         )
@@ -110,19 +108,19 @@ export function VisitorStatusView({
         const latestAdminMsg = adminMsgs[adminMsgs.length - 1]
         const latestMsgId = latestAdminMsg.id || latestAdminMsg._id || latestAdminMsg.created_at
 
-        // 첫 진입 시 기존 메시지 감지 방지
+        // 첫 로딩 시 기존 메시지 감지 방지
         if (isFirstLoadRef.current) {
           lastAdminMsgIdRef.current = latestMsgId
           isFirstLoadRef.current = false
           return
         }
 
-        // 신규 관리자 메시지 감지 시 Toast 팝업 발생
+        // 새 메시지가 들어왔을 때 팝업(Toast) 노출
         if (latestMsgId && lastAdminMsgIdRef.current !== latestMsgId) {
           lastAdminMsgIdRef.current = latestMsgId
 
           toast.info("💬 관리자 답변이 도착했습니다", {
-            description: latestAdminMsg.content || latestAdminMsg.message || "새로운 메시지가 왔습니다.",
+            description: latestAdminMsg.content || latestAdminMsg.message || "새로운 메시지가 도착했습니다.",
             duration: 6000,
             action: {
               label: "답변 확인",
@@ -131,7 +129,7 @@ export function VisitorStatusView({
           })
         }
       } catch (e) {
-        // 백그라운드 폴링 예외 무시
+        // 폴링 에러 무시
       }
     }
 
@@ -175,7 +173,7 @@ export function VisitorStatusView({
 
   return (
     <div className="mx-auto max-w-md space-y-4">
-      {/* 위변조 방지 실시간 시계 */}
+      {/* 위변조 방지 시계 */}
       <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/10 px-4 py-2.5 text-xs text-primary shadow-sm">
         <div className="flex items-center gap-1.5 font-medium">
           <ShieldAlert className="size-4 animate-pulse text-primary" />
@@ -186,7 +184,7 @@ export function VisitorStatusView({
         </div>
       </div>
 
-      {/* 메인 상태 카드 */}
+      {/* 상태 메인 카드 */}
       <Card className={`border-2 shadow-lg transition-colors ${
         status === "pending"
           ? "border-amber-500/30 bg-amber-500/10"
@@ -253,11 +251,11 @@ export function VisitorStatusView({
             </div>
           </div>
 
-          {/* 하단 버튼 (초기 화면으로 버튼 제거됨) */}
-          <div className="flex gap-3 pt-2">
+          {/* 버튼 영역 */}
+          <div className="grid grid-cols-2 gap-3 pt-2">
             <Button
               variant="outline"
-              className="flex-1 gap-2 bg-background/80"
+              className="w-full gap-2 bg-background/80"
               onClick={() => setIsChatOpen(true)}
             >
               <MessageCircle className="size-4" />
@@ -267,12 +265,23 @@ export function VisitorStatusView({
             {status === "onsite" && (
               <Button
                 variant="destructive"
-                className="flex-1 gap-2"
+                className="w-full gap-2"
                 onClick={handleExit}
                 disabled={isExiting}
               >
                 <LogOut className="size-4" />
                 {isExiting ? "처리 중..." : "퇴실하기"}
+              </Button>
+            )}
+
+            {status === "exited" && (
+              <Button
+                variant="secondary"
+                className="w-full gap-2"
+                onClick={onReset}
+              >
+                <RotateCcw className="size-4" />
+                재입실하기
               </Button>
             )}
           </div>
