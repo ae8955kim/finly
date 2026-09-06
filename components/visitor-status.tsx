@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import useSWR from "swr"
 import { toast } from "sonner"
 import { CheckCircle2, Clock, DoorOpen, Loader2, LogOut, MessageCircle, Plus, ShieldCheck } from "lucide-react"
@@ -57,6 +57,9 @@ export function VisitorStatusView({ visitorId, onReset }: VisitorStatusViewProps
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [exiting, setExiting] = useState(false)
   const [currentTime, setCurrentTime] = useState<string>("")
+  const [incomingMessage, setIncomingMessage] = useState<ChatMessage | null>(null)
+  const lastMessageIds = useRef<Set<string>>(new Set())
+  const hasInitializedMessages = useRef(false)
 
   const status = data?.status ?? "pending"
 
@@ -85,6 +88,21 @@ export function VisitorStatusView({ visitorId, onReset }: VisitorStatusViewProps
 
   const rawMessages = msgData?.messages || (Array.isArray(msgData) ? msgData : [])
   const hasUnread = rawMessages.some((m: any) => m.sender === "admin" && !(m.isRead || m.is_read))
+
+  useEffect(() => {
+    const currentIds = new Set(rawMessages.map((message: any) => String(message.id)))
+    if (hasInitializedMessages.current) {
+      const newMessage = rawMessages.find(
+        (message: any) =>
+          message.sender === "admin" &&
+          currentIds.has(String(message.id)) &&
+          !lastMessageIds.current.has(String(message.id)),
+      )
+      if (newMessage) setIncomingMessage(newMessage)
+    }
+    lastMessageIds.current = currentIds
+    hasInitializedMessages.current = true
+  }, [rawMessages])
 
   useEffect(() => {
     if (chatOpen && hasUnread && visitorId) {
@@ -179,7 +197,7 @@ export function VisitorStatusView({ visitorId, onReset }: VisitorStatusViewProps
             <Button
               variant="secondary"
               size="lg"
-              className="relative w-full bg-white/90 text-slate-900 hover:bg-white shadow-md font-bold"
+              className="relative w-full border-2 border-slate-200 bg-white text-slate-900 shadow-lg hover:bg-slate-100 font-bold"
               onClick={() => {
                 setChatOpen((v) => !v)
                 if (hasUnread) {
@@ -203,7 +221,7 @@ export function VisitorStatusView({ visitorId, onReset }: VisitorStatusViewProps
             <Button
               variant="destructive"
               size="lg"
-              className="w-full font-bold shadow-md"
+              className="w-full border-2 border-rose-800 bg-rose-700 font-bold text-white shadow-lg hover:bg-rose-800"
               onClick={() => setConfirmOpen(true)}
             >
               <LogOut className="size-4" />
@@ -214,11 +232,30 @@ export function VisitorStatusView({ visitorId, onReset }: VisitorStatusViewProps
 
         {/* 퇴실 완료 후 재입실 버튼 */}
         {status === "exited" && (
-          <Button size="lg" className="w-full bg-white text-slate-900 hover:bg-slate-100 font-bold shadow-md" onClick={handleReEntry}>
+          <Button size="lg" className="w-full border-2 border-slate-200 bg-white text-slate-900 shadow-lg hover:bg-slate-100 font-bold" onClick={handleReEntry}>
             <Plus className="size-4" />
             재입실하기
           </Button>
         )}
+
+        <AlertDialog open={Boolean(incomingMessage)} onOpenChange={(open) => !open && setIncomingMessage(null)}>
+          <AlertDialogContent className="bg-white text-slate-900 shadow-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <MessageCircle className="size-5 text-primary" />
+                관리자 메시지 도착
+              </AlertDialogTitle>
+              <AlertDialogDescription className="whitespace-pre-wrap text-slate-700">
+                {incomingMessage?.content || incomingMessage?.text || (incomingMessage as any)?.message || "새 메시지가 도착했습니다."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction onClick={() => { setIncomingMessage(null); setChatOpen(true) }}>
+                메시지 확인
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
           <AlertDialogContent className="bg-white text-slate-900">

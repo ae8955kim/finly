@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import useSWR from "swr"
 import { toast } from "sonner"
 import { FileText, MessageCircle, Trash2 } from "lucide-react"
@@ -118,6 +118,28 @@ function VisitorRow({
     const isRead = m.isRead ?? (m as any).is_read ?? false
     return isWorker && !isRead
   })
+  const seenUnreadIds = useRef<Set<string>>(new Set())
+  const initializedUnread = useRef(false)
+
+  useEffect(() => {
+    const unreadMessages = rawMessages.filter((message) => {
+      const isRead = message.isRead ?? (message as any).is_read ?? false
+      return message.sender === "worker" && !isRead
+    })
+    const unreadIds = new Set(unreadMessages.map((message) => String(message.id)))
+    if (initializedUnread.current) {
+      const newMessage = unreadMessages.find((message) => !seenUnreadIds.current.has(String(message.id)))
+      if (newMessage) {
+        const messageText = (newMessage as any).content || newMessage.text || (newMessage as any).message || "새 메시지가 도착했습니다."
+        toast.info(`${visitor.name} 공사자 메시지`, {
+          description: messageText,
+          duration: 8000,
+        })
+      }
+    }
+    seenUnreadIds.current = unreadIds
+    initializedUnread.current = true
+  }, [rawMessages, visitor.name])
 
   const markAsRead = useCallback(async () => {
     try {
