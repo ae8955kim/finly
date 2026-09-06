@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react"
 import useSWR from "swr"
 import { toast } from "sonner"
-import { Building2, MessageCircle, LogOut, Clock, CheckCircle2, RotateCcw, ShieldAlert } from "lucide-react"
+import { Building2, MessageCircle, LogOut, Clock, CheckCircle2, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -44,74 +44,22 @@ export function VisitorStatusView({
   const [isExiting, setIsExiting] = useState(false)
   const [now, setNow] = useState<Date | null>(null)
 
-  // 마지막으로 알림을 띄운 메시지 ID 추적
-  const lastNotifiedMsgIdRef = useRef<string | number | null>(null)
-  const isInitialLoadRef = useRef(true)
+  const lastAdminMsgIdRef = useRef<string | number | null>(null)
+  const isFirstLoadRef = useRef(true)
 
-  // 1. 위변조 방지 실시간 시계
+  // 1. 위변조 방지 실시간 시계 (초 단위)
   useEffect(() => {
     setNow(new Date())
     const timer = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
 
-  // 2. 방문자 상세 상태 폴링 (3초 간격)
+  // 2. 방문자 상세 정보 상태 폴링 (3초 간격)
   const { data: responseData, error, mutate } = useSWR(
     visitorId ? `/api/visitors/${visitorId}` : null,
     fetcher,
     { refreshInterval: 3000, revalidateOnFocus: true }
   )
-
-  // 3. 메시지 백그라운드 폴링 (3초 간격)
-  // 프로젝트 API 구조에 맞춰 경로를 자동 탐색합니다.
-  const { data: rawMessages } = useSWR(
-    visitorId ? `/api/messages?visitorId=${visitorId}` : null,
-    fetcher,
-    { refreshInterval: 3000, revalidateOnFocus: true }
-  )
-
-  // 백그라운드 실시간 메시지 팝업 감지
-  useEffect(() => {
-    if (!rawMessages) return
-
-    // 응답 형태 유연화 (배열 또는 { messages: [...] })
-    const msgList = Array.isArray(rawMessages)
-      ? rawMessages
-      : rawMessages.messages || rawMessages.data || []
-
-    if (!Array.isArray(msgList) || msgList.length === 0) return
-
-    // 관리자가 보낸 메시지만 필터링
-    const adminMsgs = msgList.filter(
-      (m: any) => m.sender === "admin" || m.sender_type === "admin" || m.isAdmin === true
-    )
-
-    if (adminMsgs.length === 0) return
-
-    const latestAdminMsg = adminMsgs[adminMsgs.length - 1]
-    const latestMsgId = latestAdminMsg.id || latestAdminMsg._id || latestAdminMsg.created_at
-
-    // 최초 로드 시에는 이전 메시지들에 대해 팝업을 띄우지 않고 최신 ID만 기록
-    if (isInitialLoadRef.current) {
-      lastNotifiedMsgIdRef.current = latestMsgId
-      isInitialLoadRef.current = false
-      return
-    }
-
-    // 새로운 메시지가 들어온 경우 팝업(Toast) 출력
-    if (latestMsgId && lastNotifiedMsgIdRef.current !== latestMsgId) {
-      lastNotifiedMsgIdRef.current = latestMsgId
-
-      toast.info(`💬 [관리자 문의 답변]`, {
-        description: latestAdminMsg.content || latestAdminMsg.message || "새로운 메시지가 도착했습니다.",
-        duration: 6000,
-        action: {
-          label: "대화창 열기",
-          onClick: () => setIsChatOpen(true),
-        },
-      })
-    }
-  }, [rawMessages])
 
   const visitor = responseData?.visitor || responseData?.data || responseData
   const name = visitor?.name || visitor?.visitor_name || "-"
@@ -123,18 +71,74 @@ export function VisitorStatusView({
   const enteredAt = visitor?.entered_at || visitor?.enteredAt
   const exitedAt = visitor?.exited_at || visitor?.exitedAt
 
-  // 관리자 삭제 및 404 감지 처리
+  // 3. 관리자 삭제 감지 시 자동으로 초기 화면(등록 폼)으로 전환
   useEffect(() => {
-    if (visitor && status === "deleted") {
-      toast.info("신청 정보가 삭제되었습니다. 다시 등록해 주세요.")
+    if (status === "deleted") {
+      toast.info("관리자에 의해 신청 정보가 삭제되었습니다.")
       onReset()
     }
 
     if (error && (error as any).status === 404) {
-      toast.info("등록된 신청 정보가 없습니다. 다시 등록해 주세요.")
+      toast.info("등록된 신청 정보가 없습니다.")
       onReset()
     }
-  }, [visitor, status, error, onReset])
+  }, [status, error, onReset])
+
+  // 4. 백그라운드 실시간 메시지 폴링 (팝업 감지 전용)
+  useEffect(() => {
+    if (!visitorId) return
+
+    const checkNewMessages = async () => {
+      try {
+        // 메시지 API 호환성 처리 (주요 엔드포인트 수신)
+        let res = await fetch(`/api/messages?visitorId=${visitorId}`)
+        if (!res.ok) {
+          res = await fetch(`/api/visitors/${visitorId}/messages`)
+        }
+        if (!res.ok) return
+
+        const data = await res.json()
+        const msgList = Array.isArray(data) ? data : data.messages || data.data || []
+        if (!Array.isArray(msgList) || msgList.length === 0) return
+
+        // 관리자 메시지만 추출
+        const adminMsgs = msgList.filter(
+          (m: any) => m.sender === "admin" || m.sender_type === "admin" || m.isAdmin === true
+        )
+        if (adminMsgs.length === 0) return
+
+        const latestAdminMsg = adminMsgs[adminMsgs.length - 1]
+        const latestMsgId = latestAdminMsg.id || latestAdminMsg._id || latestAdminMsg.created_at
+
+        // 첫 진입 시 기존 메시지 감지 방지
+        if (isFirstLoadRef.current) {
+          lastAdminMsgIdRef.current = latestMsgId
+          isFirstLoadRef.current = false
+          return
+        }
+
+        // 신규 관리자 메시지 감지 시 Toast 팝업 발생
+        if (latestMsgId && lastAdminMsgIdRef.current !== latestMsgId) {
+          lastAdminMsgIdRef.current = latestMsgId
+
+          toast.info("💬 관리자 답변이 도착했습니다", {
+            description: latestAdminMsg.content || latestAdminMsg.message || "새로운 메시지가 왔습니다.",
+            duration: 6000,
+            action: {
+              label: "답변 확인",
+              onClick: () => setIsChatOpen(true),
+            },
+          })
+        }
+      } catch (e) {
+        // 백그라운드 폴링 예외 무시
+      }
+    }
+
+    checkNewMessages()
+    const interval = setInterval(checkNewMessages, 3000)
+    return () => clearInterval(interval)
+  }, [visitorId])
 
   const handleExit = async () => {
     if (!visitorId) return
@@ -171,7 +175,7 @@ export function VisitorStatusView({
 
   return (
     <div className="mx-auto max-w-md space-y-4">
-      {/* 위변조 방지 시계 */}
+      {/* 위변조 방지 실시간 시계 */}
       <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/10 px-4 py-2.5 text-xs text-primary shadow-sm">
         <div className="flex items-center gap-1.5 font-medium">
           <ShieldAlert className="size-4 animate-pulse text-primary" />
@@ -182,7 +186,7 @@ export function VisitorStatusView({
         </div>
       </div>
 
-      {/* 상태 메인 카드 */}
+      {/* 메인 상태 카드 */}
       <Card className={`border-2 shadow-lg transition-colors ${
         status === "pending"
           ? "border-amber-500/30 bg-amber-500/10"
@@ -249,10 +253,11 @@ export function VisitorStatusView({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 pt-2">
+          {/* 하단 버튼 (초기 화면으로 버튼 제거됨) */}
+          <div className="flex gap-3 pt-2">
             <Button
               variant="outline"
-              className="w-full gap-2 bg-background/80"
+              className="flex-1 gap-2 bg-background/80"
               onClick={() => setIsChatOpen(true)}
             >
               <MessageCircle className="size-4" />
@@ -262,23 +267,12 @@ export function VisitorStatusView({
             {status === "onsite" && (
               <Button
                 variant="destructive"
-                className="w-full gap-2"
+                className="flex-1 gap-2"
                 onClick={handleExit}
                 disabled={isExiting}
               >
                 <LogOut className="size-4" />
                 {isExiting ? "처리 중..." : "퇴실하기"}
-              </Button>
-            )}
-
-            {(status === "pending" || status === "exited") && (
-              <Button
-                variant="secondary"
-                className="w-full gap-2"
-                onClick={onReset}
-              >
-                <RotateCcw className="size-4" />
-                초기 화면으로
               </Button>
             )}
           </div>
