@@ -42,60 +42,78 @@ export function VisitorStatusView({
 }) {
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [isExiting, setIsExiting] = useState(false)
-  
-  // 1. 위변조 방지용 실시간 시계 (초 단위 갱신)
   const [now, setNow] = useState<Date | null>(null)
 
+  // 마지막으로 알림을 띄운 메시지 ID 추적
+  const lastNotifiedMsgIdRef = useRef<string | number | null>(null)
+  const isInitialLoadRef = useRef(true)
+
+  // 1. 위변조 방지 실시간 시계
   useEffect(() => {
     setNow(new Date())
-    const timer = setInterval(() => {
-      setNow(new Date())
-    }, 1000)
+    const timer = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
 
-  // 2. 3초 간격 방문자 상태 및 메시지 폴링
+  // 2. 방문자 상세 상태 폴링 (3초 간격)
   const { data: responseData, error, mutate } = useSWR(
     visitorId ? `/api/visitors/${visitorId}` : null,
     fetcher,
-    {
-      refreshInterval: 3000,
-      revalidateOnFocus: true,
-    }
+    { refreshInterval: 3000, revalidateOnFocus: true }
   )
 
-  const { data: messages } = useSWR(
+  // 3. 메시지 백그라운드 폴링 (3초 간격)
+  // 프로젝트 API 구조에 맞춰 경로를 자동 탐색합니다.
+  const { data: rawMessages } = useSWR(
     visitorId ? `/api/messages?visitorId=${visitorId}` : null,
     fetcher,
-    {
-      refreshInterval: 3000,
-      revalidateOnFocus: true,
-    }
+    { refreshInterval: 3000, revalidateOnFocus: true }
   )
 
-  // 신규 관리자 메시지 감지 및 팝업(Toast) 알림
-  const prevMsgCountRef = useRef<number | null>(null)
-
+  // 백그라운드 실시간 메시지 팝업 감지
   useEffect(() => {
-    if (!messages || !Array.isArray(messages)) return
+    if (!rawMessages) return
 
-    const adminMsgs = messages.filter((m: any) => m.sender === "admin" || m.sender_type === "admin")
-    
-    if (prevMsgCountRef.current !== null && adminMsgs.length > prevMsgCountRef.current) {
-      const lastMsg = adminMsgs[adminMsgs.length - 1]
-      toast.info(`[관리자 메시지] ${lastMsg?.content || lastMsg?.message || "새로운 메시지가 도착했습니다."}`, {
-        duration: 5000,
+    // 응답 형태 유연화 (배열 또는 { messages: [...] })
+    const msgList = Array.isArray(rawMessages)
+      ? rawMessages
+      : rawMessages.messages || rawMessages.data || []
+
+    if (!Array.isArray(msgList) || msgList.length === 0) return
+
+    // 관리자가 보낸 메시지만 필터링
+    const adminMsgs = msgList.filter(
+      (m: any) => m.sender === "admin" || m.sender_type === "admin" || m.isAdmin === true
+    )
+
+    if (adminMsgs.length === 0) return
+
+    const latestAdminMsg = adminMsgs[adminMsgs.length - 1]
+    const latestMsgId = latestAdminMsg.id || latestAdminMsg._id || latestAdminMsg.created_at
+
+    // 최초 로드 시에는 이전 메시지들에 대해 팝업을 띄우지 않고 최신 ID만 기록
+    if (isInitialLoadRef.current) {
+      lastNotifiedMsgIdRef.current = latestMsgId
+      isInitialLoadRef.current = false
+      return
+    }
+
+    // 새로운 메시지가 들어온 경우 팝업(Toast) 출력
+    if (latestMsgId && lastNotifiedMsgIdRef.current !== latestMsgId) {
+      lastNotifiedMsgIdRef.current = latestMsgId
+
+      toast.info(`💬 [관리자 문의 답변]`, {
+        description: latestAdminMsg.content || latestAdminMsg.message || "새로운 메시지가 도착했습니다.",
+        duration: 6000,
         action: {
-          label: "보기",
+          label: "대화창 열기",
           onClick: () => setIsChatOpen(true),
         },
       })
     }
-    prevMsgCountRef.current = adminMsgs.length
-  }, [messages])
+  }, [rawMessages])
 
   const visitor = responseData?.visitor || responseData?.data || responseData
-
   const name = visitor?.name || visitor?.visitor_name || "-"
   const company = visitor?.company || visitor?.company_name || "-"
   const floor = visitor?.floor || visitor?.work_floor || "-"
@@ -105,7 +123,7 @@ export function VisitorStatusView({
   const enteredAt = visitor?.entered_at || visitor?.enteredAt
   const exitedAt = visitor?.exited_at || visitor?.exitedAt
 
-  // 관리자 삭제 감지 시 초기화
+  // 관리자 삭제 및 404 감지 처리
   useEffect(() => {
     if (visitor && status === "deleted") {
       toast.info("신청 정보가 삭제되었습니다. 다시 등록해 주세요.")
@@ -153,18 +171,18 @@ export function VisitorStatusView({
 
   return (
     <div className="mx-auto max-w-md space-y-4">
-      {/* 캡쳐 도용 방지 실시간 시간 헤더 */}
+      {/* 위변조 방지 시계 */}
       <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/10 px-4 py-2.5 text-xs text-primary shadow-sm">
         <div className="flex items-center gap-1.5 font-medium">
           <ShieldAlert className="size-4 animate-pulse text-primary" />
-          <span>위변조 방지 인증 시계</span>
+          <span>위변조 방지 실시간 시계</span>
         </div>
         <div className="font-mono text-sm font-bold tracking-wider">
           {now ? now.toLocaleTimeString("ko-KR", { hour12: false }) : "--:--:--"}
         </div>
       </div>
 
-      {/* 상태별 배경 및 메인 정보 카드 */}
+      {/* 상태 메인 카드 */}
       <Card className={`border-2 shadow-lg transition-colors ${
         status === "pending"
           ? "border-amber-500/30 bg-amber-500/10"
@@ -205,7 +223,6 @@ export function VisitorStatusView({
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* 입실 / 퇴실 기록 시간 */}
           <div className="grid grid-cols-2 gap-2 text-center text-xs">
             <div className="rounded-lg bg-background/50 p-2.5 border border-border/40">
               <span className="block text-muted-foreground mb-1">입실 시간</span>
@@ -217,7 +234,6 @@ export function VisitorStatusView({
             </div>
           </div>
 
-          {/* 신청 상세정보 */}
           <div className="space-y-2 rounded-lg bg-background/60 p-4 text-sm border border-border/40">
             <div className="flex justify-between">
               <span className="text-muted-foreground">소속</span>
@@ -233,7 +249,6 @@ export function VisitorStatusView({
             </div>
           </div>
 
-          {/* 버튼 영역 */}
           <div className="grid grid-cols-2 gap-3 pt-2">
             <Button
               variant="outline"
@@ -270,7 +285,7 @@ export function VisitorStatusView({
         </CardContent>
       </Card>
 
-      {/* 문의 / 채팅 모달 */}
+      {/* 문의 모달 */}
       <Dialog open={isChatOpen} onOpenChange={setIsChatOpen}>
         <DialogContent className="flex max-h-[85vh] flex-col gap-4 sm:max-w-md">
           <DialogHeader>
