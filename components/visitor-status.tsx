@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import useSWR from "swr"
 import { toast } from "sonner"
-import { CheckCircle2, Clock, DoorOpen, Loader2, LogOut, MessageCircle, Plus } from "lucide-react"
+import { CheckCircle2, Clock, DoorOpen, Loader2, LogOut, MessageCircle, Plus, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -47,7 +47,6 @@ export function VisitorStatusView({ visitorId, onReset }: VisitorStatusViewProps
     refreshInterval: 4000,
   })
 
-  // 3초 주기로 메시지 자동 감지 (버튼 클릭 안 해도 실시간 수신)
   const { data: msgData, mutate: mutateMessages } = useSWR<{ messages: ChatMessage[] }>(
     `/api/visitors/${visitorId}/messages`,
     fetcher,
@@ -57,14 +56,36 @@ export function VisitorStatusView({ visitorId, onReset }: VisitorStatusViewProps
   const [chatOpen, setChatOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [exiting, setExiting] = useState(false)
+  const [currentTime, setCurrentTime] = useState<string>("")
 
   const status = data?.status ?? "pending"
 
-  // 관리자(admin)가 보낸 읽지 않은 메시지가 있는지 체크
+  // 1초마다 실시간 시계 업데이트 (위·변조 방지)
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date()
+      const formatted =
+        now.getFullYear() +
+        "-" +
+        String(now.getMonth() + 1).padStart(2, "0") +
+        "-" +
+        String(now.getDate()).padStart(2, "0") +
+        " " +
+        String(now.getHours()).padStart(2, "0") +
+        ":" +
+        String(now.getMinutes()).padStart(2, "0") +
+        ":" +
+        String(now.getSeconds()).padStart(2, "0")
+      setCurrentTime(formatted)
+    }
+    updateTime()
+    const timer = setInterval(updateTime, 1000)
+    return () => clearInterval(timer)
+  }, [])
+
   const rawMessages = msgData?.messages || (Array.isArray(msgData) ? msgData : [])
   const hasUnread = rawMessages.some((m: any) => m.sender === "admin" && !(m.isRead || m.is_read))
 
-  // 채팅창이 열렸거나 열려 있는 동안 자동으로 읽음 처리 (PATCH)
   useEffect(() => {
     if (chatOpen && hasUnread && visitorId) {
       fetch(`/api/visitors/${visitorId}/messages`, { method: "PATCH" })
@@ -100,104 +121,130 @@ export function VisitorStatusView({ visitorId, onReset }: VisitorStatusViewProps
     }
   }
 
-  return (
-    <div className="flex flex-col gap-5">
-      {/* 상태 카드 */}
-      <div className="flex flex-col items-center gap-5 rounded-2xl border border-border bg-card p-8 text-center">
-        <StatusBadge status={status} />
+  // 상태별 배경색 디자인 클래스 매핑
+  const getThemeClass = () => {
+    switch (status) {
+      case "onsite":
+        return "bg-emerald-600 text-white"
+      case "pending":
+        return "bg-amber-500 text-white"
+      case "exited":
+        return "bg-rose-600 text-white"
+      default:
+        return "bg-slate-700 text-white"
+    }
+  }
 
-        {status === "onsite" && data && (
-          <div className="flex w-full flex-col gap-3 rounded-xl border border-border bg-muted/40 p-4 text-left">
-            <Row label="성명" value={data.name} />
-            <Row label="작업층" value={data.floor} />
-            <Row label="소속" value={data.company} />
+  return (
+    <div className={cn("fixed inset-0 min-h-screen w-full p-4 transition-colors duration-500 flex flex-col items-center justify-center z-50 overflow-y-auto", getThemeClass())}>
+      <div className="w-full max-w-md flex flex-col gap-5">
+        {/* 위·변조 방지 실시간 시간 표기 */}
+        <div className="flex items-center justify-between rounded-xl bg-black/25 backdrop-blur-md px-4 py-3 text-white border border-white/20 shadow-lg">
+          <div className="flex items-center gap-2 text-xs font-semibold">
+            <ShieldCheck className="size-4 animate-pulse text-white/90" />
+            <span>실시간 위·변조 방지</span>
+          </div>
+          <span className="font-mono text-sm font-bold tracking-wider">{currentTime || "시간 로딩 중..."}</span>
+        </div>
+
+        {/* 상태 카드 */}
+        <div className="flex flex-col items-center gap-5 rounded-2xl border border-white/20 bg-white/95 p-8 text-center text-slate-900 shadow-2xl backdrop-blur-sm">
+          <StatusBadge status={status} />
+
+          {status === "onsite" && data && (
+            <div className="flex w-full flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-left">
+              <Row label="성명" value={data.name} />
+              <Row label="작업층" value={data.floor} />
+              <Row label="소속" value={data.company} />
+            </div>
+          )}
+
+          {status === "exited" && (
+            <p className="text-sm text-slate-500 leading-relaxed">
+              오늘 출입이 종료되었습니다. 이용해 주셔서 감사합니다.
+            </p>
+          )}
+        </div>
+
+        {/* 채팅 패널 */}
+        {chatOpen && status !== "exited" && (
+          <div className="rounded-2xl border border-white/20 bg-white p-2 text-slate-900 shadow-xl">
+            <ChatPanel visitorId={visitorId} viewpoint="worker" className="h-80" />
           </div>
         )}
 
-        {status === "exited" && (
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            오늘 출입이 종료되었습니다. 이용해 주셔서 감사합니다.
-          </p>
-        )}
-      </div>
-
-      {/* 채팅 패널 */}
-      {chatOpen && status !== "exited" && (
-        <ChatPanel visitorId={visitorId} viewpoint="worker" className="h-80" />
-      )}
-
-      {/* 하단 액션 버튼 */}
-      {status !== "exited" && (
-        <div className="flex flex-col gap-3">
-          <Button
-            variant="outline"
-            size="lg"
-            className="relative w-full"
-            onClick={() => {
-              setChatOpen((v) => !v)
-              if (hasUnread) {
-                fetch(`/api/visitors/${visitorId}/messages`, { method: "PATCH" }).then(() =>
-                  mutateMessages()
-                )
-              }
-            }}
-          >
-            <MessageCircle className="size-4" />
-            {chatOpen ? "채팅 닫기" : "관리자 연결"}
-
-            {/* 관리자의 새 메시지가 있을 때 표시되는 빨간 알림 뱃지 */}
-            {hasUnread && (
-              <span className="absolute right-4 flex size-3">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive opacity-75"></span>
-                <span className="relative inline-flex size-3 rounded-full bg-destructive"></span>
-              </span>
-            )}
-          </Button>
-
-          <Button
-            variant="destructive"
-            size="lg"
-            className="w-full"
-            onClick={() => setConfirmOpen(true)}
-          >
-            <LogOut className="size-4" />
-            퇴실하기
-          </Button>
-        </div>
-      )}
-
-      {/* 퇴실 완료 후 재입실 버튼 */}
-      {status === "exited" && (
-        <Button size="lg" className="w-full" onClick={handleReEntry}>
-          <Plus className="size-4" />
-          재입실하기
-        </Button>
-      )}
-
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>퇴실하시겠습니까?</AlertDialogTitle>
-            <AlertDialogDescription>
-              퇴실 처리하면 관리자 대시보드에 퇴실로 기록되며 되돌릴 수 없습니다. 계속하려면 다시 &apos;퇴실&apos;을
-              눌러주세요.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={exiting}>취소</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault()
-                handleExit()
+        {/* 하단 액션 버튼 */}
+        {status !== "exited" && (
+          <div className="flex flex-col gap-3">
+            <Button
+              variant="secondary"
+              size="lg"
+              className="relative w-full bg-white/90 text-slate-900 hover:bg-white shadow-md font-bold"
+              onClick={() => {
+                setChatOpen((v) => !v)
+                if (hasUnread) {
+                  fetch(`/api/visitors/${visitorId}/messages`, { method: "PATCH" }).then(() =>
+                    mutateMessages()
+                  )
+                }
               }}
-              disabled={exiting}
-              className="bg-destructive text-white hover:bg-destructive/90"
             >
-              {exiting ? "처리 중..." : "퇴실"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              <MessageCircle className="size-4" />
+              {chatOpen ? "채팅 닫기" : "관리자 연결"}
+
+              {hasUnread && (
+                <span className="absolute right-4 flex size-3">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive opacity-75"></span>
+                  <span className="relative inline-flex size-3 rounded-full bg-destructive"></span>
+                </span>
+              )}
+            </Button>
+
+            <Button
+              variant="destructive"
+              size="lg"
+              className="w-full font-bold shadow-md"
+              onClick={() => setConfirmOpen(true)}
+            >
+              <LogOut className="size-4" />
+              퇴실하기
+            </Button>
+          </div>
+        )}
+
+        {/* 퇴실 완료 후 재입실 버튼 */}
+        {status === "exited" && (
+          <Button size="lg" className="w-full bg-white text-slate-900 hover:bg-slate-100 font-bold shadow-md" onClick={handleReEntry}>
+            <Plus className="size-4" />
+            재입실하기
+          </Button>
+        )}
+
+        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <AlertDialogContent className="bg-white text-slate-900">
+            <AlertDialogHeader>
+              <AlertDialogTitle>퇴실하시겠습니까?</AlertDialogTitle>
+              <AlertDialogDescription className="text-slate-500">
+                퇴실 처리하면 관리자 대시보드에 퇴실로 기록되며 되돌릴 수 없습니다. 계속하려면 다시 &apos;퇴실&apos;을
+                눌러주세요.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={exiting}>취소</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault()
+                  handleExit()
+                }}
+                disabled={exiting}
+                className="bg-destructive text-white hover:bg-destructive/90"
+              >
+                {exiting ? "처리 중..." : "퇴실"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     </div>
   )
 }
@@ -206,15 +253,15 @@ function StatusBadge({ status }: { status: Status }) {
   if (status === "pending") {
     return (
       <>
-        <div className="flex size-16 items-center justify-center rounded-full bg-chart-3/15 text-chart-3">
+        <div className="flex size-16 items-center justify-center rounded-full bg-amber-100 text-amber-600">
           <Clock className="size-9" />
         </div>
         <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-center gap-2 text-xl font-semibold text-card-foreground">
-            <Loader2 className="size-4 animate-spin text-chart-3" />
+          <div className="flex items-center justify-center gap-2 text-xl font-bold text-slate-900">
+            <Loader2 className="size-4 animate-spin text-amber-600" />
             승인 대기중
           </div>
-          <p className="text-sm text-muted-foreground leading-relaxed text-pretty">
+          <p className="text-sm text-slate-500 leading-relaxed text-pretty">
             관리자가 방문 정보를 확인하고 있습니다.
             <br />
             승인되면 이 화면이 자동으로 변경됩니다.
@@ -227,12 +274,12 @@ function StatusBadge({ status }: { status: Status }) {
   if (status === "onsite") {
     return (
       <>
-        <div className="flex size-16 items-center justify-center rounded-full bg-chart-2/15 text-chart-2">
+        <div className="flex size-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
           <CheckCircle2 className="size-9" />
         </div>
         <div className="flex flex-col gap-1">
-          <h2 className="text-xl font-semibold text-card-foreground">승인됨</h2>
-          <p className="text-sm text-muted-foreground leading-relaxed">출입이 승인되었습니다. 안전 작업하세요.</p>
+          <h2 className="text-xl font-bold text-slate-900">승인됨</h2>
+          <p className="text-sm text-slate-500 leading-relaxed">출입이 승인되었습니다. 안전 작업하세요.</p>
         </div>
       </>
     )
@@ -240,10 +287,10 @@ function StatusBadge({ status }: { status: Status }) {
 
   return (
     <>
-      <div className="flex size-16 items-center justify-center rounded-full bg-muted text-muted-foreground">
+      <div className="flex size-16 items-center justify-center rounded-full bg-rose-100 text-rose-600">
         <DoorOpen className="size-9" />
       </div>
-      <h2 className="text-xl font-semibold text-card-foreground">퇴실 완료</h2>
+      <h2 className="text-xl font-bold text-slate-900">퇴실 완료</h2>
     </>
   )
 }
@@ -251,8 +298,8 @@ function StatusBadge({ status }: { status: Status }) {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-4 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={cn("font-medium text-card-foreground")}>{value}</span>
+      <span className="text-slate-500 font-medium">{label}</span>
+      <span className={cn("font-bold text-slate-800")}>{value}</span>
     </div>
   )
 }

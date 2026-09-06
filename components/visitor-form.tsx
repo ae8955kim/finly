@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { HardHat } from "lucide-react"
 import { PrivacyConsentModal } from "@/components/privacy-consent-modal"
 
-const EMPTY = { name: "", floor: "", company: "", birth: "", phone: "" }
+const EMPTY = { name: "", floor: "", company: "", phone: "" }
 
 export function VisitorForm({ onRegistered }: { onRegistered: (visitorId: string) => void }) {
   const [form, setForm] = useState(EMPTY)
@@ -57,13 +57,6 @@ export function VisitorForm({ onRegistered }: { onRegistered: (visitorId: string
           <Field id="name" label="이름" value={form.name} onChange={update("name")} placeholder="홍길동" autoComplete="name" />
           <Field id="floor" label="작업층" value={form.floor} onChange={update("floor")} placeholder="예) 지하 2층, 5층" />
           <Field id="company" label="소속" value={form.company} onChange={update("company")} placeholder="예) OO건설" />
-          <Field
-            id="birth"
-            label="생년월일"
-            type="date"
-            value={form.birth}
-            onChange={update("birth")}
-          />
           <Field
             id="phone"
             label="전화번호"
