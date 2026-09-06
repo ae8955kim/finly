@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import useSWR from "swr"
 import { toast } from "sonner"
-import { Building2, MessageCircle, LogOut, Clock, CheckCircle2, RotateCcw } from "lucide-react"
+import { Building2, MessageCircle, LogOut, Clock, CheckCircle2, RotateCcw, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -42,8 +42,19 @@ export function VisitorStatusView({
 }) {
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [isExiting, setIsExiting] = useState(false)
+  
+  // 1. 위변조 방지용 실시간 시계 (초 단위 갱신)
+  const [now, setNow] = useState<Date | null>(null)
 
-  // 3초 간격 폴링
+  useEffect(() => {
+    setNow(new Date())
+    const timer = setInterval(() => {
+      setNow(new Date())
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  // 2. 3초 간격 방문자 상태 및 메시지 폴링
   const { data: responseData, error, mutate } = useSWR(
     visitorId ? `/api/visitors/${visitorId}` : null,
     fetcher,
@@ -53,7 +64,36 @@ export function VisitorStatusView({
     }
   )
 
-  // API 데이터 구조 처리 (data/visitor/단일객체 모두 지원)
+  const { data: messages } = useSWR(
+    visitorId ? `/api/messages?visitorId=${visitorId}` : null,
+    fetcher,
+    {
+      refreshInterval: 3000,
+      revalidateOnFocus: true,
+    }
+  )
+
+  // 신규 관리자 메시지 감지 및 팝업(Toast) 알림
+  const prevMsgCountRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (!messages || !Array.isArray(messages)) return
+
+    const adminMsgs = messages.filter((m: any) => m.sender === "admin" || m.sender_type === "admin")
+    
+    if (prevMsgCountRef.current !== null && adminMsgs.length > prevMsgCountRef.current) {
+      const lastMsg = adminMsgs[adminMsgs.length - 1]
+      toast.info(`[관리자 메시지] ${lastMsg?.content || lastMsg?.message || "새로운 메시지가 도착했습니다."}`, {
+        duration: 5000,
+        action: {
+          label: "보기",
+          onClick: () => setIsChatOpen(true),
+        },
+      })
+    }
+    prevMsgCountRef.current = adminMsgs.length
+  }, [messages])
+
   const visitor = responseData?.visitor || responseData?.data || responseData
 
   const name = visitor?.name || visitor?.visitor_name || "-"
@@ -65,7 +105,7 @@ export function VisitorStatusView({
   const enteredAt = visitor?.entered_at || visitor?.enteredAt
   const exitedAt = visitor?.exited_at || visitor?.exitedAt
 
-  // 삭제 및 404 감지 시 초기화
+  // 관리자 삭제 감지 시 초기화
   useEffect(() => {
     if (visitor && status === "deleted") {
       toast.info("신청 정보가 삭제되었습니다. 다시 등록해 주세요.")
@@ -113,7 +153,18 @@ export function VisitorStatusView({
 
   return (
     <div className="mx-auto max-w-md space-y-4">
-      {/* 상태별 배경색 및 카드 디자인 원상복구 */}
+      {/* 캡쳐 도용 방지 실시간 시간 헤더 */}
+      <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/10 px-4 py-2.5 text-xs text-primary shadow-sm">
+        <div className="flex items-center gap-1.5 font-medium">
+          <ShieldAlert className="size-4 animate-pulse text-primary" />
+          <span>위변조 방지 인증 시계</span>
+        </div>
+        <div className="font-mono text-sm font-bold tracking-wider">
+          {now ? now.toLocaleTimeString("ko-KR", { hour12: false }) : "--:--:--"}
+        </div>
+      </div>
+
+      {/* 상태별 배경 및 메인 정보 카드 */}
       <Card className={`border-2 shadow-lg transition-colors ${
         status === "pending"
           ? "border-amber-500/30 bg-amber-500/10"
@@ -154,7 +205,7 @@ export function VisitorStatusView({
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* 시간 정보 표시 카드 복구 */}
+          {/* 입실 / 퇴실 기록 시간 */}
           <div className="grid grid-cols-2 gap-2 text-center text-xs">
             <div className="rounded-lg bg-background/50 p-2.5 border border-border/40">
               <span className="block text-muted-foreground mb-1">입실 시간</span>
@@ -166,7 +217,7 @@ export function VisitorStatusView({
             </div>
           </div>
 
-          {/* 인적사항 카드 */}
+          {/* 신청 상세정보 */}
           <div className="space-y-2 rounded-lg bg-background/60 p-4 text-sm border border-border/40">
             <div className="flex justify-between">
               <span className="text-muted-foreground">소속</span>
@@ -182,7 +233,7 @@ export function VisitorStatusView({
             </div>
           </div>
 
-          {/* 하단 버튼 영역 */}
+          {/* 버튼 영역 */}
           <div className="grid grid-cols-2 gap-3 pt-2">
             <Button
               variant="outline"
