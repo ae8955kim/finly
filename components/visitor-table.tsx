@@ -347,11 +347,18 @@ export function VisitorTable({
     try {
       if (!id) throw new Error("방문자 ID가 없습니다.")
 
-      const res = await fetch(`/api/visitors/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      })
+      // 삭제인 경우 DELETE 메소드를 사용하여 완전히 제거함으로써 공사자가 초기화되도록 처리
+      const isDelete = action === "delete"
+      const url = `/api/visitors/${id}`
+      const options = isDelete
+        ? { method: "DELETE" }
+        : {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action }),
+          }
+
+      const res = await fetch(url, options)
       
       if (!res.ok) {
         let errorMessage = "처리에 실패했습니다."
@@ -369,7 +376,7 @@ export function VisitorTable({
       const messages: Record<string, string> = {
         approve: "승인되어 입실 처리되었습니다.",
         exit: "퇴실 처리되었습니다.",
-        delete: "목록에서 삭제되었습니다.",
+        delete: "삭제되었습니다. 해당 공사자는 처음 화면에서 승인 대기 재신청이 가능합니다.",
         restore: "복구되었습니다.",
       }
       
@@ -405,7 +412,8 @@ export function VisitorTable({
               <TableHead className="hidden lg:table-cell">전화번호</TableHead>
               <TableHead className="text-center">입실</TableHead>
               <TableHead className="text-center">퇴실</TableHead>
-              <TableHead className="text-center">���태</TableHead>
+              {/* 깨진 문자 정돈: '상태'로 수정 완료 */}
+              <TableHead className="text-center">상태</TableHead>
               <TableHead className="text-center">메모</TableHead>
               <TableHead className="text-center">문의</TableHead>
               <TableHead className="text-right">관리</TableHead>
