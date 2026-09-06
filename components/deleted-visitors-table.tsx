@@ -4,7 +4,6 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import {
   Table,
   TableBody,
@@ -14,15 +13,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import type { Visitor } from "@/lib/types"
-
-function formatTime(iso: string | null) {
-  if (!iso) return "-"
-  return new Date(iso).toLocaleTimeString("ko-KR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  })
-}
 
 function formatDate(iso: string | null) {
   if (!iso) return "-"
@@ -51,7 +41,6 @@ export function DeletedVisitorsTable({
         body: JSON.stringify({ action: "restore" }),
       })
       
-      // 네트워크 오류나 서버 오류 처리
       if (!res.ok) {
         let errorMessage = "복구에 실패했습니다."
         
@@ -59,7 +48,6 @@ export function DeletedVisitorsTable({
           const data = await res.json()
           errorMessage = data.error || errorMessage
         } catch {
-          // JSON 파싱 실패 시 상태 코드로 기본 메시지 생성
           if (res.status === 404) {
             errorMessage = "요청한 정보를 찾을 수 없습니다."
           } else if (res.status === 400) {
@@ -113,7 +101,6 @@ export function DeletedVisitorsTable({
             <TableHead>이름</TableHead>
             <TableHead>소속</TableHead>
             <TableHead>작업층</TableHead>
-            <TableHead className="hidden md:table-cell">생년월일</TableHead>
             <TableHead className="hidden lg:table-cell">전화번호</TableHead>
             <TableHead className="text-center">등록일</TableHead>
             <TableHead className="text-center">삭제일</TableHead>
@@ -128,7 +115,6 @@ export function DeletedVisitorsTable({
                 <TableCell className="font-medium">{v.name ?? "-"}</TableCell>
                 <TableCell className="text-muted-foreground">{v.company ?? "-"}</TableCell>
                 <TableCell className="text-muted-foreground">{v.floor ?? "-"}</TableCell>
-                <TableCell className="hidden text-muted-foreground md:table-cell">{v.birth ?? "-"}</TableCell>
                 <TableCell className="hidden font-mono text-xs text-muted-foreground lg:table-cell">
                   {v.phone ?? "-"}
                 </TableCell>

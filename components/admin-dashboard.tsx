@@ -1,475 +1,57 @@
-"use client"
-
-import { useState, useEffect, useRef, useMemo } from "react"
-import useSWR from "swr"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
-import { Building2, ChevronDown, Download, LogOut, RefreshCw, Search, Users, UserCheck, X } from "lucide-react"
-import { VisitorTable } from "./visitor-table"
-import { DeletedVisitorsTable } from "./deleted-visitors-table"
-import { StatCards } from "./stat-cards"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { getLocalDateString, getTodayString } from "@/lib/utils"
-import type { Visitor } from "@/lib/types"
-
-const fetcher = async (url: string) => {
+// 엑셀 다운로드 기능 (생년월일 제거 버전)
+function downloadExcel() {
   try {
-    const res = await fetch(url)
-    
-    if (!res.ok) {
-      let errorMessage = "데이터를 불러오지 못했습니다."
-      
-      if (res.status === 404) {
-        errorMessage = "요청한 데이터를 찾을 수 없습니다."
-      } else if (res.status === 400) {
-        errorMessage = "잘못된 요청입니다."
-      } else if (res.status >= 500) {
-        errorMessage = "서버 오류가 발생했습니다."
-      }
-      
-      try {
-        const errData = await res.json()
-        if (errData.error) {
-          errorMessage = errData.error
-        }
-      } catch {
-        // JSON 파싱 실패 시 기본 메시지 사용
-      }
-      
-      console.error("[v0] API error:", { status: res.status, message: errorMessage, url })
-      throw new Error(errorMessage)
+    if (!activeVisitors || activeVisitors.length === 0) {
+      toast.error("다운로드할 방문자 데이터가 없습니다.")
+      return
     }
-    
-    try {
-      return await res.json()
-    } catch {
-      console.error("[v0] JSON parsing failed:", { url })
-      throw new Error("응답 데이터를 처리할 수 없습니다.")
+
+    const targetYearMonth = selectedDate.substring(0, 7)
+
+    const monthVisitors = activeVisitors.filter((v) => {
+      const regDate = getLocalDateString(v.registeredAt || v.registered_at)
+      return regDate.startsWith(targetYearMonth)
+    })
+
+    if (monthVisitors.length === 0) {
+      toast.error("선택한 월의 방문자 데이터가 없습니다.")
+      return
     }
+
+    // '생년월일' 헤더 및 데이터 항목 제거
+    const headers = ["이름", "소속", "작업층", "전화번호", "등록시간", "입실시간", "퇴실시간", "상태", "메모"]
+    const rows = monthVisitors.map((v) => [
+      v.name || "",
+      v.company || "",
+      v.floor || "",
+      v.phone || "",
+      v.registeredAt || v.registered_at ? new Date(v.registeredAt || v.registered_at!).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "-",
+      v.enteredAt || v.entered_at ? new Date(v.enteredAt || v.entered_at!).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "-",
+      v.exitedAt || v.exited_at ? new Date(v.exitedAt || v.exited_at!).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "-",
+      v.status === "pending" ? "승인 대기" : v.status === "onsite" ? "재실 중" : "퇴실",
+      v.memo || "",
+    ])
+
+    const BOM = "\uFEFF"
+    const csv = BOM + [headers, ...rows].map((row) => row.map((cell) => `"${cell}"`).join(",")).join("\n")
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+
+    link.setAttribute("href", url)
+    link.setAttribute("download", `방문자현황_${targetYearMonth}.csv`)
+    link.style.visibility = "hidden"
+
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    toast.success("엑셀 파일이 다운로드되었습니다.")
   } catch (err) {
-    const message = err instanceof Error ? err.message : "네트워크 오류가 발생했습니다."
-    console.error("[v0] Fetcher error:", { message, url })
-    throw err
+    const message = err instanceof Error ? err.message : "다운로드에 실패했습니다."
+    toast.error(message)
+    console.error("[v0] Download error:", err)
   }
-}
-
-export function AdminDashboard() {
-  const router = useRouter()
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedDate, setSelectedDate] = useState<string>(getTodayString())
-  const [expandDeleted, setExpandDeleted] = useState(false)
-  const [showOnlyOnsite, setShowOnlyOnsite] = useState(false) // 재실 중만 보기 토글 상태
-
-  // 미래 날짜 여부 판단
-  const todayStr = getTodayString()
-  const isFutureDate = selectedDate > todayStr
-
-  // 선택된 날짜가 '오늘'인지 감지하기 위한 Ref
-  const isSelectedDateTodayRef = useRef(true)
-
-  useEffect(() => {
-    isSelectedDateTodayRef.current = selectedDate === getTodayString()
-  }, [selectedDate])
-
-  // 자정(KST 00:00:00)에 대시보드 날짜 자동 넘김 및 데이터 갱신
-  useEffect(() => {
-    let timerId: NodeJS.Timeout
-
-    const scheduleMidnightUpdate = () => {
-      const now = new Date()
-      const kstOffset = 9 * 60 * 60 * 1000
-      const utc = now.getTime() + now.getTimezoneOffset() * 60000
-      const kstNow = new Date(utc + kstOffset)
-
-      const nextMidnightKST = new Date(kstNow)
-      nextMidnightKST.setHours(24, 0, 0, 50)
-
-      const msToMidnight = nextMidnightKST.getTime() - kstNow.getTime()
-
-      timerId = setTimeout(() => {
-        const newToday = getTodayString()
-
-        if (isSelectedDateTodayRef.current) {
-          setSelectedDate(newToday)
-        }
-
-        mutate()
-        router.refresh()
-
-        scheduleMidnightUpdate()
-      }, msToMidnight)
-    }
-
-    scheduleMidnightUpdate()
-
-    return () => {
-      if (timerId) clearTimeout(timerId)
-    }
-  }, [router])
-
-  // Fetch all visitors (non-deleted)
-  const { data, error, isLoading, mutate } = useSWR<{ visitors: Visitor[] }>(
-    "/api/visitors?updateNonExited=true",
-    fetcher,
-    { 
-      refreshInterval: 5000,
-      shouldRetryOnError: true,
-      errorRetryCount: 2,
-      errorRetryInterval: 3000,
-      fallbackData: { visitors: [] },
-    },
-  )
-
-  // Fetch deleted visitors
-  const { data: deletedData } = useSWR<{ visitors: Visitor[] }>(
-    "/api/visitors?deleted=true",
-    fetcher,
-    { 
-      refreshInterval: 5000,
-      shouldRetryOnError: true,
-      errorRetryCount: 2,
-      errorRetryInterval: 3000,
-      fallbackData: { visitors: [] },
-    },
-  )
-
-  const activeVisitors = (data?.visitors ?? []).filter((v) => v.status !== "deleted")
-  const deletedVisitors = deletedData?.visitors ?? []
-  
-  // 1. 검색어 필터링
-  const filtered = activeVisitors.filter((v) => {
-    const query = searchQuery.toLowerCase()
-    return (
-      (v.name ?? "").toLowerCase().includes(query) ||
-      (v.phone ?? "").includes(query) ||
-      (v.company ?? "").toLowerCase().includes(query)
-    )
-  })
-
-  // 2. 날짜별 필터링 및 표기 가공 로직
-  const processedVisitors = useMemo(() => {
-    // 미래 날짜 선택 시 빈 배열 반환
-    if (isFutureDate) return []
-
-    return filtered
-      .filter((v) => {
-        const regDate = getLocalDateString(v.registeredAt || v.registered_at)
-        const enteredDate = getLocalDateString(v.enteredAt || v.entered_at)
-
-        // 조건 A: 선택된 날짜에 등록된 인원
-        const isRegisteredOnSelectedDate = regDate === selectedDate
-
-        // 조건 B: 선택된 날짜 이전에 입실했으나, 아직 퇴실하지 않고 재실 중(onsite)인 인원
-        const isUnexitedFromPreviousDay =
-          v.status === "onsite" &&
-          enteredDate !== "" &&
-          enteredDate < selectedDate
-
-        // 조건 C: 선택된 날짜 이전에 입실했고 선택된 날짜 이후에 퇴실한 인원
-        const exitedDate = getLocalDateString(v.exitedAt || v.exited_at)
-        const isExitedAfterSelectedDate =
-          v.status === "exited" &&
-          enteredDate !== "" &&
-          enteredDate <= selectedDate &&
-          exitedDate > selectedDate
-
-        return isRegisteredOnSelectedDate || isUnexitedFromPreviousDay || isExitedAfterSelectedDate
-      })
-      .map((v) => {
-        const enteredDate = getLocalDateString(v.enteredAt || v.entered_at)
-        const exitedDate = getLocalDateString(v.exitedAt || v.exited_at)
-        const rawEnteredAt = v.enteredAt || v.entered_at
-        const rawExitedAt = v.exitedAt || v.exited_at
-
-        let displayEnteredAt = "-"
-        let displayExitedAt = "-"
-
-        if (rawEnteredAt) {
-          try {
-            const timeStr = new Date(rawEnteredAt).toLocaleTimeString("ko-KR", {
-              timeZone: "Asia/Seoul",
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: false,
-            })
-
-            if (enteredDate !== "" && enteredDate < selectedDate) {
-              displayEnteredAt = `[전날 입실] ${timeStr}`
-            } else {
-              displayEnteredAt = timeStr
-            }
-          } catch {
-            displayEnteredAt = rawEnteredAt
-          }
-        }
-
-        if (v.status === "onsite") {
-          if (enteredDate !== "" && enteredDate < selectedDate) {
-            displayExitedAt = "명일 인계"
-          } else {
-            displayExitedAt = "-"
-          }
-        } else if (v.status === "exited" && rawExitedAt) {
-          if (exitedDate !== "" && exitedDate > selectedDate) {
-            displayExitedAt = "명일 인계"
-          } else {
-            try {
-              displayExitedAt = new Date(rawExitedAt).toLocaleTimeString("ko-KR", {
-                timeZone: "Asia/Seoul",
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-              })
-            } catch {
-              displayExitedAt = rawExitedAt
-            }
-          }
-        }
-
-        return {
-          ...v,
-          displayEnteredAt,
-          displayExitedAt,
-        }
-      })
-  }, [filtered, selectedDate, isFutureDate])
-
-  // 3. 재실 중 필터링 적용
-  const visitors = useMemo(() => {
-    if (showOnlyOnsite) {
-      return processedVisitors.filter((v) => v.status === "onsite")
-    }
-    return processedVisitors
-  }, [processedVisitors, showOnlyOnsite])
-
-  // 현재 날짜 조회 목록 기준 재실 중 인원 수
-  const onsiteCount = processedVisitors.filter((v) => v.status === "onsite").length
-
-  // 엑셀 다운로드 기능
-  function downloadExcel() {
-    try {
-      if (!activeVisitors || activeVisitors.length === 0) {
-        toast.error("다운로드할 방문자 데이터가 없습니다.")
-        return
-      }
-
-      const targetYearMonth = selectedDate.substring(0, 7)
-
-      const monthVisitors = activeVisitors.filter((v) => {
-        const regDate = getLocalDateString(v.registeredAt || v.registered_at)
-        return regDate.startsWith(targetYearMonth)
-      })
-
-      if (monthVisitors.length === 0) {
-        toast.error("선택한 월의 방문자 데이터가 없습니다.")
-        return
-      }
-
-      const headers = ["이름", "소속", "작업층", "생년월일", "전화번호", "등록시간", "입실시간", "퇴실시간", "상태", "메모"]
-      const rows = monthVisitors.map((v) => [
-        v.name || "",
-        v.company || "",
-        v.floor || "",
-        v.birth || "",
-        v.phone || "",
-        v.registeredAt || v.registered_at ? new Date(v.registeredAt || v.registered_at!).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "-",
-        v.enteredAt || v.entered_at ? new Date(v.enteredAt || v.entered_at!).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "-",
-        v.exitedAt || v.exited_at ? new Date(v.exitedAt || v.exited_at!).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "-",
-        v.status === "pending" ? "승인 대기" : v.status === "onsite" ? "재실 중" : "퇴실",
-        v.memo || "",
-      ])
-
-      const BOM = "\uFEFF"
-      const csv = BOM + [headers, ...rows].map((row) => row.map((cell) => `"${cell}"`).join(",")).join("\n")
-
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
-      const link = document.createElement("a")
-      const url = URL.createObjectURL(blob)
-
-      link.setAttribute("href", url)
-      link.setAttribute("download", `방문자현황_${targetYearMonth}.csv`)
-      link.style.visibility = "hidden"
-
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-
-      toast.success("엑셀 파일이 다운로드되었습니다.")
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "다운로드에 실패했습니다."
-      toast.error(message)
-      console.error("[v0] Download error:", err)
-    }
-  }
-
-  async function handleLogout() {
-    try {
-      const res = await fetch("/api/admin/login", { method: "DELETE" })
-      
-      if (!res.ok) {
-        console.warn("[v0] Logout API returned non-ok status:", res.status)
-      }
-      
-      toast.success("로그아웃되었습니다.")
-      router.refresh()
-    } catch (err) {
-      console.error("[v0] Logout error:", err)
-      toast.error("로그아웃 중 오류가 발생했습니다.")
-    }
-  }
-
-  return (
-    <main className="w-full min-h-screen bg-background">
-      <div className="mx-auto w-full px-4 py-8 sm:px-6">
-        <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex size-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <Building2 className="size-6" />
-            </div>
-            <div className="flex flex-col">
-              <h1 className="text-xl font-bold tracking-tight">방문 공사자 관리</h1>
-              <p className="text-sm text-muted-foreground">실시간 출입 현황 대시보드</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => mutate()}>
-              <RefreshCw className="size-4" />
-              새로고침
-            </Button>
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
-              <LogOut className="size-4" />
-              로그아웃
-            </Button>
-          </div>
-        </header>
-
-        <div className="flex flex-col gap-6">
-          <StatCards visitors={visitors} activeVisitors={activeVisitors} selectedDate={selectedDate} />
-
-          <section className="flex flex-col gap-4">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="flex flex-col gap-2">
-                <label htmlFor="date" className="text-sm font-medium">
-                  날짜 선택
-                </label>
-                <input
-                  id="date"
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="rounded-lg border border-border px-3 py-2 text-sm"
-                />
-              </div>
-
-              <div className="flex flex-1 flex-wrap items-center justify-end gap-3 md:max-w-xl">
-                <div className="relative flex-1 min-w-[200px]">
-                  <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="이름, 전화번호, 회사명 검색..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 pr-10"
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery("")}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      aria-label="검색 초기화"
-                    >
-                      <X className="size-4" />
-                    </button>
-                  )}
-                </div>
-
-                {/* 재실 중만 보기 버튼 */}
-                <Button
-                  variant={showOnlyOnsite ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setShowOnlyOnsite((prev) => !prev)}
-                  className="gap-1.5 whitespace-nowrap"
-                  disabled={isFutureDate}
-                >
-                  {showOnlyOnsite ? (
-                    <>
-                      <Users className="size-4" />
-                      전체 보기
-                    </>
-                  ) : (
-                    <>
-                      <UserCheck className="size-4" />
-                      재실 중만 보기 ({onsiteCount})
-                    </>
-                  )}
-                </Button>
-
-                <Button variant="outline" size="sm" onClick={downloadExcel}>
-                  <Download className="size-4" />
-                  엑셀 다운로드
-                </Button>
-              </div>
-            </div>
-
-            {error ? (
-              <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-                데이터를 불러오지 못했습니다. 새로고침을 눌러 다시 시도해 주세요.
-              </div>
-            ) : isLoading ? (
-              <div className="rounded-xl border border-border py-16 text-center text-sm text-muted-foreground">
-                불러오는 중...
-              </div>
-            ) : isFutureDate ? (
-              <div className="rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
-                미래 날짜의 방문자 데이터는 존재하지 않습니다.
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between">
-                  <h2 className="text-base font-semibold">
-                    {selectedDate === getTodayString()
-                      ? showOnlyOnsite ? "오늘의 재실 인원" : "오늘의 방문자"
-                      : showOnlyOnsite ? "선택된 날짜의 재실 인원" : "선택된 날짜의 방문자"}
-                  </h2>
-                  <span className="text-xs text-muted-foreground">
-                    {searchQuery ? `검색결과: ${visitors.length}명` : `총 ${visitors.length}명`}
-                  </span>
-                </div>
-                <VisitorTable visitors={visitors} onMutate={() => mutate()} />
-              </>
-            )}
-          </section>
-
-          {/* Collapsed Section: Deleted Visitors */}
-          <section className="flex flex-col gap-4">
-            <button
-              onClick={() => setExpandDeleted(!expandDeleted)}
-              className="flex items-center justify-between rounded-lg border border-border p-4 hover:bg-muted/50 transition-colors"
-            >
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <ChevronDown
-                  className={`size-4 transition-transform ${expandDeleted ? "rotate-180" : ""}`}
-                />
-                삭제된 인원 목록 ({deletedVisitors.length}명)
-              </h3>
-            </button>
-
-            {expandDeleted && (
-              <div className="flex flex-col gap-4">
-                {deletedVisitors.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
-                    삭제된 인원이 없습니다.
-                  </div>
-                ) : (
-                  <DeletedVisitorsTable visitors={deletedVisitors} onMutate={() => {
-                    mutate()
-                  }} />
-                )}
-              </div>
-            )}
-          </section>
-        </div>
-      </div>
-    </main>
-  )
 }

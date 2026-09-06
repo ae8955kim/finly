@@ -145,7 +145,6 @@ function VisitorRow({
       <TableCell className="font-medium">{visitor.name ?? "-"}</TableCell>
       <TableCell className="text-muted-foreground">{visitor.company ?? "-"}</TableCell>
       <TableCell className="text-muted-foreground">{visitor.floor ?? "-"}</TableCell>
-      <TableCell className="hidden text-muted-foreground md:table-cell">{visitor.birth ?? "-"}</TableCell>
       <TableCell className="hidden font-mono text-xs text-muted-foreground lg:table-cell">
         {visitor.phone ?? "-"}
       </TableCell>
@@ -161,7 +160,7 @@ function VisitorRow({
         )}
       </TableCell>
 
-      {/* 퇴실 시간 란: 실제 퇴실(exited) 상태일 때만 퇴실 시간을 표시하고 그 외엔 '-' 유지 */}
+      {/* 퇴실 시간 란 */}
       <TableCell className="text-center font-mono text-xs tabular-nums">
         {visitor.status === "exited" ? formatTime(exitedTime) : "-"}
       </TableCell>
@@ -372,7 +371,6 @@ export function VisitorTable({
               <TableHead>이름</TableHead>
               <TableHead>소속</TableHead>
               <TableHead>작업층</TableHead>
-              <TableHead className="hidden md:table-cell">생년월일</TableHead>
               <TableHead className="hidden lg:table-cell">전화번호</TableHead>
               <TableHead className="text-center">입실</TableHead>
               <TableHead className="text-center">퇴실</TableHead>
