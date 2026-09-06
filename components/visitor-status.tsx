@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 import useSWR from "swr"
 import { toast } from "sonner"
 import { Building2, MessageCircle, LogOut, Clock, CheckCircle2, ShieldAlert, RotateCcw } from "lucide-react"
@@ -45,7 +45,7 @@ export function VisitorStatusView({
   const [now, setNow] = useState<Date | null>(null)
 
   const lastAdminMsgIdRef = useRef<string | number | null>(null)
-  const isFirstLoadRef = useRef(true)
+  const isInitializedRef = useRef(false)
 
   // 1. 위변조 방지 실시간 시계 (초 단위)
   useEffect(() => {
@@ -84,59 +84,74 @@ export function VisitorStatusView({
     }
   }, [status, error, onReset])
 
-  // 4. 독립 백그라운드 메시지 폴링 (팝업 감지)
-  useEffect(() => {
+  // 4. 메시지 체크 전용 함수 (독립 동작)
+  const fetchAndCheckMessages = useCallback(async () => {
     if (!visitorId) return
 
-    const checkNewMessages = async () => {
-      try {
-        let res = await fetch(`/api/messages?visitorId=${visitorId}`)
-        if (!res.ok) {
-          res = await fetch(`/api/visitors/${visitorId}/messages`)
-        }
-        if (!res.ok) return
-
-        const data = await res.json()
-        const msgList = Array.isArray(data) ? data : data.messages || data.data || []
-        if (!Array.isArray(msgList) || msgList.length === 0) return
-
-        const adminMsgs = msgList.filter(
-          (m: any) => m.sender === "admin" || m.sender_type === "admin" || m.isAdmin === true
-        )
-        if (adminMsgs.length === 0) return
-
-        const latestAdminMsg = adminMsgs[adminMsgs.length - 1]
-        const latestMsgId = latestAdminMsg.id || latestAdminMsg._id || latestAdminMsg.created_at
-
-        // 첫 로딩 시 기존 메시지 감지 방지
-        if (isFirstLoadRef.current) {
-          lastAdminMsgIdRef.current = latestMsgId
-          isFirstLoadRef.current = false
-          return
-        }
-
-        // 새 메시지가 들어왔을 때 팝업(Toast) 노출
-        if (latestMsgId && lastAdminMsgIdRef.current !== latestMsgId) {
-          lastAdminMsgIdRef.current = latestMsgId
-
-          toast.info("💬 관리자 답변이 도착했습니다", {
-            description: latestAdminMsg.content || latestAdminMsg.message || "새로운 메시지가 도착했습니다.",
-            duration: 6000,
-            action: {
-              label: "답변 확인",
-              onClick: () => setIsChatOpen(true),
-            },
-          })
-        }
-      } catch (e) {
-        // 폴링 에러 무시
+    try {
+      let res = await fetch(`/api/messages?visitorId=${visitorId}`)
+      if (!res.ok) {
+        res = await fetch(`/api/visitors/${visitorId}/messages`)
       }
-    }
+      if (!res.ok) return
 
-    checkNewMessages()
-    const interval = setInterval(checkNewMessages, 3000)
-    return () => clearInterval(interval)
+      const data = await res.json()
+      const msgList = Array.isArray(data)
+        ? data
+        : data.messages || data.data || []
+
+      if (!Array.isArray(msgList)) return
+
+      // 모든 관리자 전송 필드 형태 호환
+      const adminMsgs = msgList.filter((m: any) => {
+        const sender = String(m.sender || m.sender_type || m.role || "").toLowerCase()
+        return sender === "admin" || m.isAdmin === true || m.is_admin === true
+      })
+
+      if (adminMsgs.length === 0) {
+        isInitializedRef.current = true
+        return
+      }
+
+      const latestAdminMsg = adminMsgs[adminMsgs.length - 1]
+      const latestMsgId = latestAdminMsg.id || latestAdminMsg._id || latestAdminMsg.created_at || latestAdminMsg.timestamp
+
+      // 처음 렌더링될 때는 기존 메시지 ID만 등록하고 팝업 스킵
+      if (!isInitializedRef.current) {
+        lastAdminMsgIdRef.current = latestMsgId
+        isInitializedRef.current = true
+        return
+      }
+
+      // 새로운 메시지가 추가되었을 때 즉시 팝업(Toast) 출력
+      if (latestMsgId && lastAdminMsgIdRef.current !== latestMsgId) {
+        lastAdminMsgIdRef.current = latestMsgId
+
+        const contentText = latestAdminMsg.content || latestAdminMsg.message || latestAdminMsg.text || "새로운 메시지가 도착했습니다."
+
+        toast.info("💬 관리자 문의 답변", {
+          description: contentText,
+          duration: 6000,
+          action: {
+            label: "답변 확인",
+            onClick: () => setIsChatOpen(true),
+          },
+        })
+      }
+    } catch (e) {
+      // 수신 에러 발생 시 무시
+    }
   }, [visitorId])
+
+  // 화면이 켜지자마자 메시지 수신 감지기 개시 (채팅창 열기와 무관하게 동작)
+  useEffect(() => {
+    isInitializedRef.current = false
+    lastAdminMsgIdRef.current = null
+
+    fetchAndCheckMessages()
+    const interval = setInterval(fetchAndCheckMessages, 3000)
+    return () => clearInterval(interval)
+  }, [visitorId, fetchAndCheckMessages])
 
   const handleExit = async () => {
     if (!visitorId) return
