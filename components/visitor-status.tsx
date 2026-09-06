@@ -20,6 +20,19 @@ const fetcher = async (url: string) => {
   return res.json()
 }
 
+function formatTime(isoStr?: string | null) {
+  if (!isoStr) return "-"
+  try {
+    return new Date(isoStr).toLocaleTimeString("ko-KR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+  } catch {
+    return "-"
+  }
+}
+
 export function VisitorStatusView({
   visitorId,
   onReset,
@@ -30,8 +43,8 @@ export function VisitorStatusView({
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [isExiting, setIsExiting] = useState(false)
 
-  // 3초 간격 실시간 상태 조회
-  const { data: rawVisitor, error, mutate } = useSWR(
+  // 3초 간격 폴링
+  const { data: responseData, error, mutate } = useSWR(
     visitorId ? `/api/visitors/${visitorId}` : null,
     fetcher,
     {
@@ -40,17 +53,19 @@ export function VisitorStatusView({
     }
   )
 
-  // API 응답 데이터가 wrapper 객체({ visitor: ... }) 형태로 들어오는 경우 대비
-  const visitor = rawVisitor?.visitor || rawVisitor
+  // API 데이터 구조 처리 (data/visitor/단일객체 모두 지원)
+  const visitor = responseData?.visitor || responseData?.data || responseData
 
-  // 다양한 DB 필드명 대응 (CamelCase & SnakeCase)
-  const name = visitor?.name || visitor?.visitor_name || visitor?.visitorName || "방문자"
-  const company = visitor?.company || visitor?.company_name || visitor?.companyName || "-"
-  const floor = visitor?.floor || visitor?.work_floor || visitor?.floorInfo || "-"
-  const phone = visitor?.phone || visitor?.phone_number || visitor?.phoneNumber || "-"
+  const name = visitor?.name || visitor?.visitor_name || "-"
+  const company = visitor?.company || visitor?.company_name || "-"
+  const floor = visitor?.floor || visitor?.work_floor || "-"
+  const phone = visitor?.phone || visitor?.phone_number || "-"
   const status = visitor?.status || "pending"
+  
+  const enteredAt = visitor?.entered_at || visitor?.enteredAt
+  const exitedAt = visitor?.exited_at || visitor?.exitedAt
 
-  // 관리자 삭제 및 404 감지 처리
+  // 삭제 및 404 감지 시 초기화
   useEffect(() => {
     if (visitor && status === "deleted") {
       toast.info("신청 정보가 삭제되었습니다. 다시 등록해 주세요.")
@@ -63,7 +78,6 @@ export function VisitorStatusView({
     }
   }, [visitor, status, error, onReset])
 
-  // 공사자 직접 퇴실 요청
   const handleExit = async () => {
     if (!visitorId) return
     setIsExiting(true)
@@ -99,27 +113,40 @@ export function VisitorStatusView({
 
   return (
     <div className="mx-auto max-w-md space-y-4">
-      <Card className="border-border/50 shadow-lg">
+      {/* 상태별 배경색 및 카드 디자인 원상복구 */}
+      <Card className={`border-2 shadow-lg transition-colors ${
+        status === "pending"
+          ? "border-amber-500/30 bg-amber-500/10"
+          : status === "onsite"
+          ? "border-emerald-500/30 bg-emerald-500/10"
+          : "border-slate-500/30 bg-slate-500/10"
+      }`}>
         <CardHeader className="pb-4 text-center">
-          <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <div className={`mx-auto mb-2 flex size-12 items-center justify-center rounded-full ${
+            status === "pending"
+              ? "bg-amber-500/20 text-amber-500"
+              : status === "onsite"
+              ? "bg-emerald-500/20 text-emerald-500"
+              : "bg-slate-500/20 text-slate-400"
+          }`}>
             <Building2 className="size-6" />
           </div>
           <CardTitle className="text-xl font-bold">{name} 님</CardTitle>
-          <CardDescription>{company} · {floor}</CardDescription>
+          <CardDescription className="text-foreground/70">{company} · {floor}</CardDescription>
           
-          <div className="pt-2">
+          <div className="pt-2 flex justify-center">
             {status === "pending" && (
-              <Badge variant="outline" className="gap-1 border-chart-3/20 bg-chart-3/15 text-xs text-chart-3">
+              <Badge variant="outline" className="gap-1 border-amber-500/40 bg-amber-500/20 px-3 py-1 text-xs text-amber-400">
                 <Clock className="size-3.5" /> 승인 대기 중
               </Badge>
             )}
             {status === "onsite" && (
-              <Badge variant="outline" className="gap-1 border-chart-2/20 bg-chart-2/15 text-xs text-chart-2">
+              <Badge variant="outline" className="gap-1 border-emerald-500/40 bg-emerald-500/20 px-3 py-1 text-xs text-emerald-400">
                 <CheckCircle2 className="size-3.5" /> 재실 중 (승인 완료)
               </Badge>
             )}
             {status === "exited" && (
-              <Badge variant="outline" className="gap-1 border-border bg-muted text-xs text-muted-foreground">
+              <Badge variant="outline" className="gap-1 border-slate-500/40 bg-slate-500/20 px-3 py-1 text-xs text-slate-400">
                 퇴실 완료
               </Badge>
             )}
@@ -127,7 +154,20 @@ export function VisitorStatusView({
         </CardHeader>
 
         <CardContent className="space-y-4">
-          <div className="space-y-2 rounded-lg bg-muted/50 p-4 text-sm">
+          {/* 시간 정보 표시 카드 복구 */}
+          <div className="grid grid-cols-2 gap-2 text-center text-xs">
+            <div className="rounded-lg bg-background/50 p-2.5 border border-border/40">
+              <span className="block text-muted-foreground mb-1">입실 시간</span>
+              <span className="font-mono text-sm font-semibold">{formatTime(enteredAt)}</span>
+            </div>
+            <div className="rounded-lg bg-background/50 p-2.5 border border-border/40">
+              <span className="block text-muted-foreground mb-1">퇴실 시간</span>
+              <span className="font-mono text-sm font-semibold">{formatTime(exitedAt)}</span>
+            </div>
+          </div>
+
+          {/* 인적사항 카드 */}
+          <div className="space-y-2 rounded-lg bg-background/60 p-4 text-sm border border-border/40">
             <div className="flex justify-between">
               <span className="text-muted-foreground">소속</span>
               <span className="font-medium">{company}</span>
@@ -142,18 +182,17 @@ export function VisitorStatusView({
             </div>
           </div>
 
+          {/* 하단 버튼 영역 */}
           <div className="grid grid-cols-2 gap-3 pt-2">
-            {/* 문의/채팅 버튼 */}
             <Button
               variant="outline"
-              className="w-full gap-2"
+              className="w-full gap-2 bg-background/80"
               onClick={() => setIsChatOpen(true)}
             >
               <MessageCircle className="size-4" />
               관리자 문의
             </Button>
 
-            {/* 상태별 액션 버튼 */}
             {status === "onsite" && (
               <Button
                 variant="destructive"
@@ -168,7 +207,7 @@ export function VisitorStatusView({
 
             {(status === "pending" || status === "exited") && (
               <Button
-                variant="outline"
+                variant="secondary"
                 className="w-full gap-2"
                 onClick={onReset}
               >
