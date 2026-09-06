@@ -3,13 +3,12 @@
 import { useEffect, useState } from "react"
 import useSWR from "swr"
 import { toast } from "sonner"
-import { Building2, MessageCircle, LogOut, Clock, CheckCircle2 } from "lucide-react"
+import { Building2, MessageCircle, LogOut, Clock, CheckCircle2, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ChatPanel } from "@/components/chat-panel"
-import type { Visitor } from "@/lib/types"
 
 const fetcher = async (url: string) => {
   const res = await fetch(url)
@@ -31,8 +30,8 @@ export function VisitorStatusView({
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [isExiting, setIsExiting] = useState(false)
 
-  // 3초 간격 실시간 조회
-  const { data: visitor, error, mutate } = useSWR<Visitor>(
+  // 3초 간격 실시간 상태 조회
+  const { data: rawVisitor, error, mutate } = useSWR(
     visitorId ? `/api/visitors/${visitorId}` : null,
     fetcher,
     {
@@ -41,9 +40,19 @@ export function VisitorStatusView({
     }
   )
 
-  // 관리자 삭제 감지 처리
+  // API 응답 데이터가 wrapper 객체({ visitor: ... }) 형태로 들어오는 경우 대비
+  const visitor = rawVisitor?.visitor || rawVisitor
+
+  // 다양한 DB 필드명 대응 (CamelCase & SnakeCase)
+  const name = visitor?.name || visitor?.visitor_name || visitor?.visitorName || "방문자"
+  const company = visitor?.company || visitor?.company_name || visitor?.companyName || "-"
+  const floor = visitor?.floor || visitor?.work_floor || visitor?.floorInfo || "-"
+  const phone = visitor?.phone || visitor?.phone_number || visitor?.phoneNumber || "-"
+  const status = visitor?.status || "pending"
+
+  // 관리자 삭제 및 404 감지 처리
   useEffect(() => {
-    if (visitor && visitor.status === "deleted") {
+    if (visitor && status === "deleted") {
       toast.info("신청 정보가 삭제되었습니다. 다시 등록해 주세요.")
       onReset()
     }
@@ -52,7 +61,7 @@ export function VisitorStatusView({
       toast.info("등록된 신청 정보가 없습니다. 다시 등록해 주세요.")
       onReset()
     }
-  }, [visitor, error, onReset])
+  }, [visitor, status, error, onReset])
 
   // 공사자 직접 퇴실 요청
   const handleExit = async () => {
@@ -84,33 +93,33 @@ export function VisitorStatusView({
     )
   }
 
-  if (!visitor || visitor.status === "deleted") {
+  if (!visitor || status === "deleted") {
     return null
   }
 
   return (
     <div className="mx-auto max-w-md space-y-4">
       <Card className="border-border/50 shadow-lg">
-        <CardHeader className="text-center pb-4">
+        <CardHeader className="pb-4 text-center">
           <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Building2 className="size-6" />
           </div>
-          <CardTitle className="text-xl font-bold">{visitor.name} 님</CardTitle>
-          <CardDescription>{visitor.company} · {visitor.floor}</CardDescription>
+          <CardTitle className="text-xl font-bold">{name} 님</CardTitle>
+          <CardDescription>{company} · {floor}</CardDescription>
           
           <div className="pt-2">
-            {visitor.status === "pending" && (
-              <Badge variant="outline" className="bg-chart-3/15 text-chart-3 border-chart-3/20 gap-1 px-3 py-1 text-xs">
+            {status === "pending" && (
+              <Badge variant="outline" className="gap-1 border-chart-3/20 bg-chart-3/15 text-xs text-chart-3">
                 <Clock className="size-3.5" /> 승인 대기 중
               </Badge>
             )}
-            {visitor.status === "onsite" && (
-              <Badge variant="outline" className="bg-chart-2/15 text-chart-2 border-chart-2/20 gap-1 px-3 py-1 text-xs">
+            {status === "onsite" && (
+              <Badge variant="outline" className="gap-1 border-chart-2/20 bg-chart-2/15 text-xs text-chart-2">
                 <CheckCircle2 className="size-3.5" /> 재실 중 (승인 완료)
               </Badge>
             )}
-            {visitor.status === "exited" && (
-              <Badge variant="outline" className="bg-muted text-muted-foreground border-border gap-1 px-3 py-1 text-xs">
+            {status === "exited" && (
+              <Badge variant="outline" className="gap-1 border-border bg-muted text-xs text-muted-foreground">
                 퇴실 완료
               </Badge>
             )}
@@ -118,14 +127,18 @@ export function VisitorStatusView({
         </CardHeader>
 
         <CardContent className="space-y-4">
-          <div className="rounded-lg bg-muted/50 p-4 space-y-2 text-sm">
+          <div className="space-y-2 rounded-lg bg-muted/50 p-4 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">연락처</span>
-              <span className="font-mono">{visitor.phone}</span>
+              <span className="text-muted-foreground">소속</span>
+              <span className="font-medium">{company}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">작업층</span>
-              <span>{visitor.floor}</span>
+              <span className="font-medium">{floor}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">연락처</span>
+              <span className="font-mono">{phone}</span>
             </div>
           </div>
 
@@ -140,8 +153,8 @@ export function VisitorStatusView({
               관리자 문의
             </Button>
 
-            {/* 퇴실 / 신규 등록 버튼 */}
-            {visitor.status === "onsite" && (
+            {/* 상태별 액션 버튼 */}
+            {status === "onsite" && (
               <Button
                 variant="destructive"
                 className="w-full gap-2"
@@ -153,13 +166,14 @@ export function VisitorStatusView({
               </Button>
             )}
 
-            {(visitor.status === "pending" || visitor.status === "exited") && (
+            {(status === "pending" || status === "exited") && (
               <Button
                 variant="outline"
-                className="w-full"
+                className="w-full gap-2"
                 onClick={onReset}
               >
-                새로 등록하기
+                <RotateCcw className="size-4" />
+                초기 화면으로
               </Button>
             )}
           </div>
@@ -173,7 +187,7 @@ export function VisitorStatusView({
             <DialogTitle>관리자 문의하기</DialogTitle>
           </DialogHeader>
           <ChatPanel 
-            visitorId={visitor.id} 
+            visitorId={visitor.id || visitorId} 
             viewpoint="worker" 
             className="h-96"
           />
