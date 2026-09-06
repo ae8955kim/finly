@@ -9,7 +9,7 @@ export function WorkerApp() {
   const [visitorId, setVisitorId] = useState<string | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
 
-  // Load session from localStorage on mount
+  // 컴포넌트 마운트 시 localStorage에서 visitorId 로드
   useEffect(() => {
     const saved = localStorage.getItem("visitorId")
     if (saved) {
@@ -18,12 +18,22 @@ export function WorkerApp() {
     setIsLoaded(true)
   }, [])
 
-  // Save session to localStorage whenever visitorId changes
+  // visitorId 변경 시 localStorage 저장 및 삭제 동기화
   useEffect(() => {
-    if (isLoaded && visitorId) {
-      localStorage.setItem("visitorId", visitorId)
+    if (isLoaded) {
+      if (visitorId) {
+        localStorage.setItem("visitorId", visitorId)
+      } else {
+        localStorage.removeItem("visitorId")
+      }
     }
   }, [visitorId, isLoaded])
+
+  // 리셋(초기화) 핸들러
+  const handleReset = () => {
+    localStorage.removeItem("visitorId")
+    setVisitorId(null)
+  }
 
   if (!isLoaded) {
     return (
@@ -37,7 +47,7 @@ export function WorkerApp() {
     return (
       <VisitorStatusView 
         visitorId={visitorId} 
-        onReset={() => setVisitorId(null)}
+        onReset={handleReset}
       />
     )
   }
