@@ -7,17 +7,6 @@ import { Lock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ADMIN_STORAGE_KEY } from "@/lib/auth"
-
-const TARGET_PASSWORD_HASH = "80f1a2380fdbf3b062a4d3caefd368e5dfa40c614b8a43fca3a242a420b9e84b"
-
-async function hashPassword(password: string) {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(password)
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("")
-}
 
 export function AdminLogin() {
   const [password, setPassword] = useState("")
@@ -29,11 +18,14 @@ export function AdminLogin() {
     setSubmitting(true)
 
     try {
-      const hashedInput = await hashPassword(password)
+      // 비밀번호 직접 비교 ("**qhdks00")
+      if (password === "**qhdks00") {
+        // localStorage와 쿠키에 동시 저장하여 인증 상태 확실히 유지
+        localStorage.setItem("admin_auth", "ok")
+        localStorage.setItem("isAdmin", "true")
+        
+        document.cookie = "admin_auth=true; path=/; max-age=86400"
 
-      if (hashedInput === TARGET_PASSWORD_HASH) {
-        // localStorage에 세션 저장
-        localStorage.setItem(ADMIN_STORAGE_KEY, "ok")
         toast.success("로그인되었습니다.")
         
         setTimeout(() => {
