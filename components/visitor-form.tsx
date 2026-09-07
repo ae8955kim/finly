@@ -30,7 +30,7 @@ export function VisitorForm({ onRegistered }: { onRegistered: (visitorId: string
 
     setSubmitting(true)
     try {
-      // 서버 API(/api/visitors) 대신 Supabase 클라이언트를 통해 직접 DB에 데이터를 삽입합니다.
+      // 버그 1 수정: 등록 시 곧바로 'onsite(재실)'가 아니라 'pending(승인 대기)' 상태로 들어가도록 변경
       const { data, error } = await supabase
         .from("visitors")
         .insert([
@@ -39,9 +39,9 @@ export function VisitorForm({ onRegistered }: { onRegistered: (visitorId: string
             floor: form.floor,
             company: form.company,
             phone: form.phone,
-            status: "onsite", // 현장 등록 시 곧바로 재실(onsite) 상태로 처리
+            status: "pending", // 승인 대기 상태로 설정
             registered_at: new Date().toISOString(),
-            entered_at: new Date().toISOString(),
+            // entered_at은 관리자가 승인 후 입실 처리할 때 들어가도록 제외합니다.
           },
         ])
         .select()
@@ -50,7 +50,7 @@ export function VisitorForm({ onRegistered }: { onRegistered: (visitorId: string
       if (error) throw error
       if (!data) throw new Error("등록에 실패했습니다.")
 
-      toast.success("방문 등록이 완료되었습니다.")
+      toast.success("방문 신청이 완료되었습니다. 관리자 승인을 기다려주세요.")
       onRegistered(data.id)
     } catch (err: any) {
       console.error("[Visitor Register Error]:", err)

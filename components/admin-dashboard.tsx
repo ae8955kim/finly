@@ -261,7 +261,7 @@ export function AdminDashboard() {
     }
   }
 
-  // Supabase 세션 초기화 및 로컬 상태 정리 로그아웃 함수
+  // 버그 2 수정: 로그아웃 후 메인 화면으로 가지 않고 현재 주소(/admin 등)를 유지하도록 수정
   async function handleLogout() {
     try {
       await supabase.auth.signOut()
@@ -279,8 +279,8 @@ export function AdminDashboard() {
 
     toast.success("로그아웃되었습니다.")
 
-    const targetUrl = window.location.origin + (window.location.pathname.includes('/manage') ? '/manage/' : '/')
-    window.location.replace(targetUrl)
+    // 현재 경로(예: /admin)를 그대로 유지하며 새로고침
+    window.location.replace(window.location.href)
   }
 
   return (
