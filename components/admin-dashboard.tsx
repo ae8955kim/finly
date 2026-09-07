@@ -35,7 +35,6 @@ export function AdminDashboard() {
   }, [selectedDate])
 
   const fetchVisitors = async () => {
-    setIsLoading(true)
     setError(null)
     try {
       const { data: active, error: activeErr } = await supabase
@@ -64,9 +63,30 @@ export function AdminDashboard() {
     }
   }
 
+  // 초기 로드 및 Supabase 실시간(Realtime) 구독 설정
   useEffect(() => {
     fetchVisitors()
-  }, [])
+
+    // Realtime 채널 설정 (새로운 신청이나 상태 변경 시 자동 갱신)
+    const channel = supabase
+      .channel("visitors-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "visitors",
+        },
+        () => {
+          fetchVisitors()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [supabase])
 
   useEffect(() => {
     let timerId: NodeJS.Timeout
@@ -261,7 +281,6 @@ export function AdminDashboard() {
     }
   }
 
-  // 버그 2 수정: 로그아웃 후 메인 화면으로 가지 않고 현재 주소(/admin 등)를 유지하도록 수정
   async function handleLogout() {
     try {
       await supabase.auth.signOut()
@@ -278,8 +297,6 @@ export function AdminDashboard() {
     }
 
     toast.success("로그아웃되었습니다.")
-
-    // 현재 경로(예: /admin)를 그대로 유지하며 새로고침
     window.location.replace(window.location.href)
   }
 
