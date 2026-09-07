@@ -1,13 +1,14 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { HardHat } from "lucide-react"
 import { PrivacyConsentModal } from "@/components/privacy-consent-modal"
+import { createClient } from "@/lib/supabase/client"
 
 const EMPTY = { name: "", floor: "", company: "", phone: "" }
 
@@ -16,6 +17,8 @@ export function VisitorForm({ onRegistered }: { onRegistered: (visitorId: string
   const [submitting, setSubmitting] = useState(false)
   const [showPrivacyModal, setShowPrivacyModal] = useState(true)
   const [privacyAgreed, setPrivacyAgreed] = useState(false)
+
+  const supabase = useMemo(() => createClient(), [])
 
   function update(key: keyof typeof EMPTY) {
     return (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [key]: e.target.value }))
@@ -27,17 +30,31 @@ export function VisitorForm({ onRegistered }: { onRegistered: (visitorId: string
 
     setSubmitting(true)
     try {
-      const res = await fetch("/api/visitors", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "등록에 실패했습니다.")
+      // 서버 API(/api/visitors) 대신 Supabase 클라이언트를 통해 직접 DB에 데이터를 삽입합니다.
+      const { data, error } = await supabase
+        .from("visitors")
+        .insert([
+          {
+            name: form.name,
+            floor: form.floor,
+            company: form.company,
+            phone: form.phone,
+            status: "onsite", // 현장 등록 시 곧바로 재실(onsite) 상태로 처리
+            registered_at: new Date().toISOString(),
+            entered_at: new Date().toISOString(),
+          },
+        ])
+        .select()
+        .single()
+
+      if (error) throw error
+      if (!data) throw new Error("등록에 실패했습니다.")
+
       toast.success("방문 등록이 완료되었습니다.")
-      onRegistered(data.visitor.id)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "오류가 발생했습니다.")
+      onRegistered(data.id)
+    } catch (err: any) {
+      console.error("[Visitor Register Error]:", err)
+      toast.error(err.message || "오류가 발생했습니다.")
     } finally {
       setSubmitting(false)
     }

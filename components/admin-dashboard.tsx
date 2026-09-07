@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo } from "react"
-import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Building2, ChevronDown, Download, LogOut, RefreshCw, Search, Users, UserCheck, X } from "lucide-react"
 import { VisitorTable } from "./visitor-table"
@@ -14,7 +13,6 @@ import { createClient } from "@/lib/supabase/client"
 import type { Visitor } from "@/lib/types"
 
 export function AdminDashboard() {
-  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString())
   const [expandDeleted, setExpandDeleted] = useState(false)
@@ -264,7 +262,6 @@ export function AdminDashboard() {
   }
 
   function handleLogout() {
-    // 1. 브라우저에 저장된 모든 세션, 로컬 스토리지, 쿠키 데이터 완벽 파괴
     try {
       localStorage.clear()
       sessionStorage.clear()
@@ -280,7 +277,6 @@ export function AdminDashboard() {
 
     toast.success("로그아웃되었습니다.")
 
-    // 2. 캐시를 무시하고 루트 주소로 강제 이동하여 로그인 화면을 다시 띄움
     const targetUrl = window.location.origin + (window.location.pathname.includes('/manage') ? '/manage/' : '/')
     window.location.replace(targetUrl)
   }
