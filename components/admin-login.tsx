@@ -7,6 +7,7 @@ import { Lock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { ADMIN_STORAGE_KEY } from "@/lib/auth"
 
 export function AdminLogin() {
   const [password, setPassword] = useState("")
@@ -20,12 +21,9 @@ export function AdminLogin() {
     try {
       // 비밀번호 직접 비교 ("**qhdks00")
       if (password === "**qhdks00") {
-        // localStorage와 쿠키에 동시 저장하여 인증 상태 확실히 유지
-        localStorage.setItem("admin_auth", "ok")
-        localStorage.setItem("isAdmin", "true")
+        // lib/auth.ts에서 사용하는 ADMIN_STORAGE_KEY("admin_session")와 일치시킴
+        localStorage.setItem(ADMIN_STORAGE_KEY, "ok")
         
-        document.cookie = "admin_auth=true; path=/; max-age=86400"
-
         toast.success("로그인되었습니다.")
         
         setTimeout(() => {
