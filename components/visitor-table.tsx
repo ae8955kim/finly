@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import useSWR from "swr"
 import { toast } from "sonner"
 import { FileText, MessageCircle, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -24,12 +23,10 @@ import {
 } from "@/components/ui/dialog"
 import { ChatPanel } from "@/components/chat-panel"
 import type { Visitor, ChatMessage } from "@/lib/types"
+import { supabase } from "@/lib/supabase" // 프로젝트의 Supabase 클라이언트 경로 확인
 
 type VisitorStatus = Visitor["status"]
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json())
-
-// 오늘 날짜인지 확인하는 헬퍼 함수
 function isToday(isoDateString?: string | null) {
   if (!isoDateString) return false
   const date = new Date(isoDateString)
@@ -41,7 +38,6 @@ function isToday(isoDateString?: string | null) {
   )
 }
 
-// 시간 포맷 헬퍼 함수
 function formatTime(iso: string | null | undefined) {
   if (!iso) return "-"
   try {
@@ -55,7 +51,6 @@ function formatTime(iso: string | null | undefined) {
   }
 }
 
-// 입실 시간 포맷 (전날 입실 시 [YYYY.MM.DD HH:mm] 출력)
 function formatEnteredTime(iso: string | null | undefined, isPrevious: boolean) {
   if (!iso) return "-"
   try {
@@ -114,22 +109,33 @@ function VisitorRow({
   isChatOpen: boolean
 }) {
   const meta = STATUS_META[visitor.status] || STATUS_META.pending
+  const [rawMessages, setRawMessages] = useState<ChatMessage[]>([])
 
-  const { data: msgData, mutate } = useSWR<{ messages: ChatMessage[] }>(
-    `/api/visitors/${visitor.id}/messages`,
-    fetcher,
-    { 
-      refreshInterval: isChatOpen ? 3000 : 8000,
-      revalidateOnFocus: true,
+  // Supabase Direct Fetch for Messages
+  const fetchMessages = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("visitor_id", visitor.id)
+      .order("created_at", { ascending: true })
+
+    if (!error && data) {
+      setRawMessages(data as ChatMessage[])
     }
-  )
+  }, [visitor.id])
 
-  const rawMessages = msgData?.messages || (Array.isArray(msgData) ? (msgData as ChatMessage[]) : [])
+  useEffect(() => {
+    fetchMessages()
+    const interval = setInterval(fetchMessages, isChatOpen ? 3000 : 8000)
+    return () => clearInterval(interval)
+  }, [fetchMessages, isChatOpen])
+
   const hasUnread = Array.isArray(rawMessages) && rawMessages.some((m) => {
     const isWorker = m.sender === "worker"
     const isRead = m.isRead ?? (m as any).is_read ?? false
     return isWorker && !isRead
   })
+  
   const seenUnreadIds = useRef<Set<string>>(new Set())
   const initializedUnread = useRef(false)
 
@@ -164,12 +170,16 @@ function VisitorRow({
 
   const markAsRead = useCallback(async () => {
     try {
-      await fetch(`/api/visitors/${visitor.id}/messages`, { method: "PATCH" })
-      mutate()
+      await supabase
+        .from("messages")
+        .update({ is_read: true })
+        .eq("visitor_id", visitor.id)
+        .eq("sender", "worker")
+      fetchMessages()
     } catch (err) {
       console.error("읽음 처리 실패:", err)
     }
-  }, [visitor.id, mutate])
+  }, [visitor.id, fetchMessages])
 
   useEffect(() => {
     if (isChatOpen && hasUnread) {
@@ -192,7 +202,6 @@ function VisitorRow({
         {visitor.phone ?? "-"}
       </TableCell>
       
-      {/* 입실 시간 란 */}
       <TableCell className="text-center font-mono text-xs tabular-nums">
         {isPrevious ? (
           <span className="font-medium text-chart-2">
@@ -203,7 +212,6 @@ function VisitorRow({
         )}
       </TableCell>
 
-      {/* 퇴실 시간 란 */}
       <TableCell className="text-center font-mono text-xs tabular-nums">
         {visitor.status === "exited" ? formatTime(exitedTime) : "-"}
       </TableCell>
@@ -214,7 +222,6 @@ function VisitorRow({
         </Badge>
       </TableCell>
       
-      {/* 메모 버튼 */}
       <TableCell className="text-center">
         <Button
           size="icon"
@@ -231,7 +238,6 @@ function VisitorRow({
         </Button>
       </TableCell>
 
-      {/* 문의 / 채팅 버튼 */}
       <TableCell className="text-center">
         <div className="relative inline-block">
           <Button
@@ -254,7 +260,6 @@ function VisitorRow({
         </div>
       </TableCell>
 
-      {/* 상태 관리 액션 버튼 */}
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-2">
           {visitor.status === "pending" && (
@@ -325,17 +330,13 @@ export function VisitorTable({
   const [memoText, setMemoText] = useState("")
   const [savingMemo, setSavingMemo] = useState(false)
 
-  // 당일분만 남기는 필터링 (전날 명단 중 미퇴실자(onsite)나 전날 표시 플래그가 있는 경우 제외, 지나간 날짜의 퇴실/삭제 인원 자르기)
   const filteredVisitors = (visitors || []).filter((v) => {
     const isPreviousDay = v.is_from_previous_day ?? (v as any).isFromPreviousDay
     const createdAt = (v as any).created_at || (v as any).createdAt || v.entered_at
     
-    // 1. 이전 날부터 연속 재실 중인 인원이면 표시
     if (isPreviousDay || v.status === "onsite") return true
-    // 2. 당일 생성되었거나 입실한 인원이면 표시
     if (isToday(createdAt) || isToday(v.entered_at)) return true
     
-    // 3. 그 외 어제 이전의 퇴실/삭제 데이터는 당일 목록에서 숨김
     return false
   })
 
@@ -348,13 +349,12 @@ export function VisitorTable({
     if (!memoVisitor) return
     setSavingMemo(true)
     try {
-      const res = await fetch(`/api/visitors/${memoVisitor.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "memo", memo: memoText }),
-      })
+      const { error } = await supabase
+        .from("visitors")
+        .update({ memo: memoText })
+        .eq("id", memoVisitor.id)
 
-      if (!res.ok) throw new Error("메모 저장에 실패했습니다.")
+      if (error) throw new Error(error.message || "메모 저장에 실패했습니다.")
 
       toast.success("메모가 저장되었습니다.")
       setMemoVisitor(null)
@@ -373,25 +373,25 @@ export function VisitorTable({
     try {
       if (!id) throw new Error("방문자 ID가 없습니다.")
 
-      // PATCH 방식으로 status를 'deleted'로 업데이트하여 '삭제된 인원' Tab/목록에서 조회 가능하게 유지
-      const res = await fetch(`/api/visitors/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      })
-      
-      if (!res.ok) {
-        let errorMessage = "처리에 실패했습니다."
-        try {
-          const data = await res.json()
-          errorMessage = data.error || errorMessage
-        } catch {
-          if (res.status === 404) errorMessage = "요청한 정보를 찾을 수 없습니다."
-          else if (res.status === 400) errorMessage = "잘못된 요청입니다."
-          else if (res.status >= 500) errorMessage = "서버 오류가 발생했습니다."
-        }
-        throw new Error(errorMessage)
+      let updatePayload: Record<string, any> = {}
+      const now = new Date().toISOString()
+
+      if (action === "approve") {
+        updatePayload = { status: "onsite", entered_at: now }
+      } else if (action === "exit") {
+        updatePayload = { status: "exited", exited_at: now }
+      } else if (action === "delete") {
+        updatePayload = { status: "deleted", deleted_at: now }
+      } else if (action === "restore") {
+        updatePayload = { status: "pending", deleted_at: null }
       }
+
+      const { error } = await supabase
+        .from("visitors")
+        .update(updatePayload)
+        .eq("id", id)
+
+      if (error) throw new Error(error.message || "처리에 실패했습니다.")
 
       const messages: Record<string, string> = {
         approve: "승인되어 입실 처리되었습니다.",
@@ -454,7 +454,6 @@ export function VisitorTable({
         </Table>
       </div>
 
-      {/* 채팅 모달 */}
       <Dialog open={chatWith !== null} onOpenChange={(open) => !open && setChatWith(null)}>
         <DialogContent className="flex max-h-[80vh] flex-col gap-4 sm:max-w-md">
           <DialogHeader>
@@ -472,7 +471,6 @@ export function VisitorTable({
         </DialogContent>
       </Dialog>
 
-      {/* 메모 모달 */}
       <Dialog open={memoVisitor !== null} onOpenChange={(open) => !open && setMemoVisitor(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

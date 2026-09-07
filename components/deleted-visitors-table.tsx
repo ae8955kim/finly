@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import type { Visitor } from "@/lib/types"
+import { supabase } from "@/lib/supabase" // 프로젝트의 Supabase 클라이언트 경로 확인
 
 function formatDate(iso: string | null) {
   if (!iso) return "-"
@@ -35,40 +36,13 @@ export function DeletedVisitorsTable({
         throw new Error("방문자 ID가 없습니다.")
       }
 
-      const res = await fetch(`/api/visitors/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "restore" }),
-      })
-      
-      if (!res.ok) {
-        let errorMessage = "복구에 실패했습니다."
-        
-        try {
-          const data = await res.json()
-          errorMessage = data.error || errorMessage
-        } catch {
-          if (res.status === 404) {
-            errorMessage = "요청한 정보를 찾을 수 없습니다."
-          } else if (res.status === 400) {
-            errorMessage = "잘못된 요청입니다."
-          } else if (res.status >= 500) {
-            errorMessage = "서버 오류가 발생했습니다."
-          }
-        }
-        
-        console.error("[v0] API error in restore:", { status: res.status, id, message: errorMessage })
-        throw new Error(errorMessage)
-      }
-      
-      try {
-        const data = await res.json()
-        if (!data.success || !data.data) {
-          throw new Error("응답 데이터가 유효하지 않습니다.")
-        }
-      } catch (parseErr) {
-        console.error("[v0] Response parsing error:", parseErr)
-        throw new Error("응답 데이터를 처리할 수 없습니다.")
+      const { error } = await supabase
+        .from("visitors")
+        .update({ status: "pending", deleted_at: null })
+        .eq("id", id)
+
+      if (error) {
+        throw new Error(error.message || "복구에 실패했습니다.")
       }
 
       toast.success("복구되었습니다.")
@@ -119,10 +93,10 @@ export function DeletedVisitorsTable({
                   {v.phone ?? "-"}
                 </TableCell>
                 <TableCell className="text-center text-sm text-muted-foreground">
-                  {formatDate(v.registeredAt ?? null)}
+                  {formatDate(v.registeredAt ?? (v as any).created_at ?? null)}
                 </TableCell>
                 <TableCell className="text-center text-sm text-muted-foreground">
-                  {formatDate(v.deletedAt ?? null)}
+                  {formatDate(v.deletedAt ?? (v as any).deleted_at ?? null)}
                 </TableCell>
                 <TableCell className="text-right">
                   <Button
