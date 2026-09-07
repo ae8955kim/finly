@@ -9,7 +9,6 @@ export default function Page() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
 
   useEffect(() => {
-    // lib/auth.ts 의 isAdmin() 검증 함수 직접 활용
     const checkAuth = async () => {
       const loggedIn = await isAdmin()
       setIsAuthenticated(loggedIn)
