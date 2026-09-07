@@ -5,10 +5,11 @@ import { AdminLogin } from "@/components/admin-login"
 import { AdminDashboard } from "@/components/admin-dashboard"
 import { ADMIN_COOKIE } from "@/lib/auth"
 
-export default function AdminPage() {
+export default function Page() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
 
   useEffect(() => {
+    // 저장된 쿠키 확인
     const checkAuth = () => {
       const cookies = document.cookie.split("; ")
       const authCookie = cookies.find((row) => row.startsWith(`${ADMIN_COOKIE}=`))
