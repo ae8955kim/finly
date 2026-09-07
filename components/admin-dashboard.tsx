@@ -10,7 +10,7 @@ import { StatCards } from "./stat-cards"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getLocalDateString, getTodayString } from "@/lib/utils"
-import { createClient } from "@/lib/supabase/client" // Supabase 클라이언트 파일 경로에 맞춰 확인 필요
+import { createClient } from "@/lib/supabase/client"
 import type { Visitor } from "@/lib/types"
 
 export function AdminDashboard() {
@@ -25,26 +25,21 @@ export function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Supabase 클라이언트 인스턴스 생성
   const supabase = useMemo(() => createClient(), [])
 
-  // 미래 날짜 여부 판단
   const todayStr = getTodayString()
   const isFutureDate = selectedDate > todayStr
 
-  // 선택된 날짜가 '오늘'인지 감지하기 위한 Ref
   const isSelectedDateTodayRef = useRef(true)
 
   useEffect(() => {
     isSelectedDateTodayRef.current = selectedDate === getTodayString()
   }, [selectedDate])
 
-  // Supabase에서 방문자 데이터 직접 조회
   const fetchVisitors = async () => {
     setIsLoading(true)
     setError(null)
     try {
-      // 1. 삭제되지 않은 방문자 가져오기
       const { data: active, error: activeErr } = await supabase
         .from("visitors")
         .select("*")
@@ -53,7 +48,6 @@ export function AdminDashboard() {
 
       if (activeErr) throw activeErr
 
-      // 2. 삭제된 방문자 가져오기
       const { data: deleted, error: deletedErr } = await supabase
         .from("visitors")
         .select("*")
@@ -76,7 +70,6 @@ export function AdminDashboard() {
     fetchVisitors()
   }, [])
 
-  // 자정(KST 00:00:00)에 대시보드 날짜 자동 넘김 및 데이터 갱신
   useEffect(() => {
     let timerId: NodeJS.Timeout
 
@@ -113,7 +106,6 @@ export function AdminDashboard() {
   const activeVisitors = visitorsData
   const deletedVisitors = deletedVisitorsData
 
-  // 1. 검색어 필터링
   const filtered = activeVisitors.filter((v) => {
     const query = searchQuery.toLowerCase()
     return (
@@ -123,7 +115,6 @@ export function AdminDashboard() {
     )
   })
 
-  // 2. 날짜별 필터링 및 표기 가공 로직
   const processedVisitors = useMemo(() => {
     if (isFutureDate) return []
 
@@ -132,16 +123,13 @@ export function AdminDashboard() {
         const regDate = getLocalDateString(v.registeredAt || v.registered_at)
         const enteredDate = getLocalDateString(v.enteredAt || v.entered_at)
 
-        // 조건 A: 선택된 날짜에 등록된 인원
         const isRegisteredOnSelectedDate = regDate === selectedDate
 
-        // 조건 B: 선택된 날짜 이전에 입실했으나, 아직 퇴실하지 않고 재실 중(onsite)인 인원
         const isUnexitedFromPreviousDay =
           v.status === "onsite" &&
           enteredDate !== "" &&
           enteredDate < selectedDate
 
-        // 조건 C: 선택된 날짜 이전에 입실했고 선택된 날짜 이후에 퇴실한 인원
         const exitedDate = getLocalDateString(v.exitedAt || v.exited_at)
         const isExitedAfterSelectedDate =
           v.status === "exited" &&
@@ -210,7 +198,6 @@ export function AdminDashboard() {
       })
   }, [filtered, selectedDate, isFutureDate])
 
-  // 3. 재실 중 필터링 적용
   const visitors = useMemo(() => {
     if (showOnlyOnsite) {
       return processedVisitors.filter((v) => v.status === "onsite")
@@ -220,7 +207,6 @@ export function AdminDashboard() {
 
   const onsiteCount = processedVisitors.filter((v) => v.status === "onsite").length
 
-  // 엑셀 다운로드 기능
   function downloadExcel() {
     try {
       if (!activeVisitors || activeVisitors.length === 0) {

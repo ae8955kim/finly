@@ -13,10 +13,17 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import type { Visitor } from "@/lib/types"
+import { createClient } from "@/lib/supabase/client"
 
-function formatDate(iso: string | null) {
+const supabase = createClient()
+
+function formatDate(iso: string | null | undefined) {
   if (!iso) return "-"
-  return new Date(iso).toLocaleDateString("ko-KR")
+  try {
+    return new Date(iso).toLocaleDateString("ko-KR")
+  } catch {
+    return "-"
+  }
 }
 
 export function DeletedVisitorsTable({
@@ -35,40 +42,13 @@ export function DeletedVisitorsTable({
         throw new Error("방문자 ID가 없습니다.")
       }
 
-      const res = await fetch(`/api/visitors/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "restore" }),
-      })
-      
-      if (!res.ok) {
-        let errorMessage = "복구에 실패했습니다."
-        
-        try {
-          const data = await res.json()
-          errorMessage = data.error || errorMessage
-        } catch {
-          if (res.status === 404) {
-            errorMessage = "요청한 정보를 찾을 수 없습니다."
-          } else if (res.status === 400) {
-            errorMessage = "잘못된 요청입니다."
-          } else if (res.status >= 500) {
-            errorMessage = "서버 오류가 발생했습니다."
-          }
-        }
-        
-        console.error("[v0] API error in restore:", { status: res.status, id, message: errorMessage })
-        throw new Error(errorMessage)
-      }
-      
-      try {
-        const data = await res.json()
-        if (!data.success || !data.data) {
-          throw new Error("응답 데이터가 유효하지 않습니다.")
-        }
-      } catch (parseErr) {
-        console.error("[v0] Response parsing error:", parseErr)
-        throw new Error("응답 데이터를 처리할 수 없습니다.")
+      const { error } = await supabase
+        .from("visitors")
+        .update({ status: "pending", deleted_at: null })
+        .eq("id", id)
+
+      if (error) {
+        throw new Error(error.message || "복구에 실패했습니다.")
       }
 
       toast.success("복구되었습니다.")
@@ -78,14 +58,14 @@ export function DeletedVisitorsTable({
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "오류가 발생했습니다."
-      console.error("[v0] Error restoring visitor:", { error: err, errorMessage })
+      console.error("[Restore Error]:", { error: err, errorMessage })
       toast.error(errorMessage)
     } finally {
       setPendingId(null)
     }
   }
 
-  if (visitors.length === 0) {
+  if (!visitors || visitors.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
         삭제된 인원이 없습니다.
@@ -119,10 +99,10 @@ export function DeletedVisitorsTable({
                   {v.phone ?? "-"}
                 </TableCell>
                 <TableCell className="text-center text-sm text-muted-foreground">
-                  {formatDate(v.registeredAt ?? null)}
+                  {formatDate(v.registeredAt || v.registered_at)}
                 </TableCell>
                 <TableCell className="text-center text-sm text-muted-foreground">
-                  {formatDate(v.deletedAt ?? null)}
+                  {formatDate(v.deletedAt || v.deleted_at)}
                 </TableCell>
                 <TableCell className="text-right">
                   <Button
