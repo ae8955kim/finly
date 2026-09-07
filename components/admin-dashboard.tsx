@@ -264,8 +264,19 @@ export function AdminDashboard() {
   }
 
   function handleLogout() {
+    // 1. 브라우저 저장소의 로그인 관련 세션/토큰 강제 삭제 (필요시 키값 추가 가능)
+    try {
+      localStorage.clear()
+      sessionStorage.clear()
+    } catch (e) {
+      console.error(e)
+    }
+
     toast.success("로그아웃되었습니다.")
-    router.push("/login")
+
+    // 2. 404 에러가 나는 /login 대신 안전하게 루트 경로로 이동하여 로그인 화면을 다시 띄움
+    const basePath = window.location.pathname.includes('/manage') ? '/manage/' : '/'
+    window.location.href = basePath
   }
 
   return (
