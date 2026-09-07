@@ -264,19 +264,25 @@ export function AdminDashboard() {
   }
 
   function handleLogout() {
-    // 1. 브라우저 저장소의 로그인 관련 세션/토큰 강제 삭제 (필요시 키값 추가 가능)
+    // 1. 브라우저에 저장된 모든 세션, 로컬 스토리지, 쿠키 데이터 완벽 파괴
     try {
       localStorage.clear()
       sessionStorage.clear()
+      
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/")
+      })
     } catch (e) {
       console.error(e)
     }
 
     toast.success("로그아웃되었습니다.")
 
-    // 2. 404 에러가 나는 /login 대신 안전하게 루트 경로로 이동하여 로그인 화면을 다시 띄움
-    const basePath = window.location.pathname.includes('/manage') ? '/manage/' : '/'
-    window.location.href = basePath
+    // 2. 캐시를 무시하고 루트 주소로 강제 이동하여 로그인 화면을 다시 띄움
+    const targetUrl = window.location.origin + (window.location.pathname.includes('/manage') ? '/manage/' : '/')
+    window.location.replace(targetUrl)
   }
 
   return (
@@ -370,7 +376,7 @@ export function AdminDashboard() {
             </div>
 
             {error ? (
-              <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+              <div className="rounded-xl border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive">
                 {error}
               </div>
             ) : isLoading ? (
