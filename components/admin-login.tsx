@@ -32,9 +32,12 @@ export function AdminLogin() {
       const hashedInput = await hashPassword(password)
 
       if (hashedInput === TARGET_PASSWORD_HASH) {
+        // 쿠키 저장 (path=/ 도메인 전체 적용)
         document.cookie = `${ADMIN_COOKIE}=ok; path=/; max-age=86400; SameSite=Lax`
         toast.success("로그인되었습니다.")
-        window.location.reload()
+        
+        // basePath 환경에서 확실한 화면 갱신
+        window.location.href = window.location.pathname
       } else {
         throw new Error("비밀번호가 올바르지 않습니다.")
       }
