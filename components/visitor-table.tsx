@@ -23,56 +23,11 @@ import {
 } from "@/components/ui/dialog"
 import { ChatPanel } from "@/components/chat-panel"
 import type { Visitor, ChatMessage } from "@/lib/types"
-import { supabase } from "@/lib/supabase" // 프로젝트의 Supabase 클라이언트 경로 확인
+import { createClient } from "@/lib/supabase/client"
+
+const supabase = createClient()
 
 type VisitorStatus = Visitor["status"]
-
-function isToday(isoDateString?: string | null) {
-  if (!isoDateString) return false
-  const date = new Date(isoDateString)
-  const today = new Date()
-  return (
-    date.getFullYear() === today.getFullYear() &&
-    date.getMonth() === today.getMonth() &&
-    date.getDate() === today.getDate()
-  )
-}
-
-function formatTime(iso: string | null | undefined) {
-  if (!iso) return "-"
-  try {
-    return new Date(iso).toLocaleTimeString("ko-KR", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    })
-  } catch {
-    return "-"
-  }
-}
-
-function formatEnteredTime(iso: string | null | undefined, isPrevious: boolean) {
-  if (!iso) return "-"
-  try {
-    const d = new Date(iso)
-    const timeStr = d.toLocaleTimeString("ko-KR", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    })
-
-    if (isPrevious) {
-      const year = d.getFullYear()
-      const month = String(d.getMonth() + 1).padStart(2, "0")
-      const day = String(d.getDate()).padStart(2, "0")
-      return `[${year}.${month}.${day} ${timeStr}]`
-    }
-
-    return timeStr
-  } catch {
-    return "-"
-  }
-}
 
 const STATUS_META: Record<VisitorStatus, { label: string; className: string }> = {
   pending: {
@@ -101,7 +56,7 @@ function VisitorRow({
   onOpenMemo,
   isChatOpen,
 }: {
-  visitor: Visitor
+  visitor: Visitor & { displayEnteredAt?: string; displayExitedAt?: string }
   busy: boolean
   onAct: (id: string, action: "approve" | "exit" | "delete" | "restore") => void
   onOpenChat: (visitor: Visitor) => void
@@ -111,7 +66,6 @@ function VisitorRow({
   const meta = STATUS_META[visitor.status] || STATUS_META.pending
   const [rawMessages, setRawMessages] = useState<ChatMessage[]>([])
 
-  // Supabase Direct Fetch for Messages
   const fetchMessages = useCallback(async () => {
     const { data, error } = await supabase
       .from("messages")
@@ -135,7 +89,7 @@ function VisitorRow({
     const isRead = m.isRead ?? (m as any).is_read ?? false
     return isWorker && !isRead
   })
-  
+
   const seenUnreadIds = useRef<Set<string>>(new Set())
   const initializedUnread = useRef(false)
 
@@ -189,9 +143,6 @@ function VisitorRow({
 
   const memoValue = visitor.memo
   const hasMemo = Boolean(memoValue && String(memoValue).trim().length > 0)
-  const isPrevious = visitor.is_from_previous_day ?? (visitor as any).isFromPreviousDay
-  const enteredTime = visitor.entered_at ?? (visitor as any).enteredAt
-  const exitedTime = visitor.exited_at ?? (visitor as any).exitedAt
 
   return (
     <TableRow>
@@ -203,17 +154,11 @@ function VisitorRow({
       </TableCell>
       
       <TableCell className="text-center font-mono text-xs tabular-nums">
-        {isPrevious ? (
-          <span className="font-medium text-chart-2">
-            {formatEnteredTime(enteredTime, true)}
-          </span>
-        ) : (
-          formatEnteredTime(enteredTime, false)
-        )}
+        {visitor.displayEnteredAt ?? "-"}
       </TableCell>
 
       <TableCell className="text-center font-mono text-xs tabular-nums">
-        {visitor.status === "exited" ? formatTime(exitedTime) : "-"}
+        {visitor.displayExitedAt ?? "-"}
       </TableCell>
 
       <TableCell className="text-center">
@@ -330,16 +275,6 @@ export function VisitorTable({
   const [memoText, setMemoText] = useState("")
   const [savingMemo, setSavingMemo] = useState(false)
 
-  const filteredVisitors = (visitors || []).filter((v) => {
-    const isPreviousDay = v.is_from_previous_day ?? (v as any).isFromPreviousDay
-    const createdAt = (v as any).created_at || (v as any).createdAt || v.entered_at
-    
-    if (isPreviousDay || v.status === "onsite") return true
-    if (isToday(createdAt) || isToday(v.entered_at)) return true
-    
-    return false
-  })
-
   const handleOpenMemo = (visitor: Visitor) => {
     setMemoVisitor(visitor)
     setMemoText(visitor.memo || (visitor as any).memo || "")
@@ -412,7 +347,7 @@ export function VisitorTable({
     }
   }
 
-  if (!Array.isArray(filteredVisitors) || filteredVisitors.length === 0) {
+  if (!Array.isArray(visitors) || visitors.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
         아직 등록된 방문자가 없습니다.
@@ -439,7 +374,7 @@ export function VisitorTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredVisitors.map((v) => (
+            {visitors.map((v) => (
               <VisitorRow
                 key={v.id}
                 visitor={v}

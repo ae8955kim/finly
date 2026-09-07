@@ -13,11 +13,17 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import type { Visitor } from "@/lib/types"
-import { supabase } from "@/lib/supabase" // 프로젝트의 Supabase 클라이언트 경로 확인
+import { createClient } from "@/lib/supabase/client"
 
-function formatDate(iso: string | null) {
+const supabase = createClient()
+
+function formatDate(iso: string | null | undefined) {
   if (!iso) return "-"
-  return new Date(iso).toLocaleDateString("ko-KR")
+  try {
+    return new Date(iso).toLocaleDateString("ko-KR")
+  } catch {
+    return "-"
+  }
 }
 
 export function DeletedVisitorsTable({
@@ -52,14 +58,14 @@ export function DeletedVisitorsTable({
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "오류가 발생했습니다."
-      console.error("[v0] Error restoring visitor:", { error: err, errorMessage })
+      console.error("[Restore Error]:", { error: err, errorMessage })
       toast.error(errorMessage)
     } finally {
       setPendingId(null)
     }
   }
 
-  if (visitors.length === 0) {
+  if (!visitors || visitors.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
         삭제된 인원이 없습니다.
@@ -93,10 +99,10 @@ export function DeletedVisitorsTable({
                   {v.phone ?? "-"}
                 </TableCell>
                 <TableCell className="text-center text-sm text-muted-foreground">
-                  {formatDate(v.registeredAt ?? (v as any).created_at ?? null)}
+                  {formatDate(v.registeredAt || v.registered_at)}
                 </TableCell>
                 <TableCell className="text-center text-sm text-muted-foreground">
-                  {formatDate(v.deletedAt ?? (v as any).deleted_at ?? null)}
+                  {formatDate(v.deletedAt || v.deleted_at)}
                 </TableCell>
                 <TableCell className="text-right">
                   <Button
