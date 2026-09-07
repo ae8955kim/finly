@@ -122,7 +122,11 @@ export function AdminDashboard() {
   }, [])
 
   const activeVisitors = visitorsData
-  const deletedVisitors = deletedVisitorsData
+  const deletedVisitors = deletedVisitorsData.filter((visitor) => {
+    const deletedDate = getLocalDateString(visitor.deletedAt || visitor.deleted_at)
+    const registeredDate = getLocalDateString(visitor.registeredAt || visitor.registered_at)
+    return deletedDate === selectedDate || (deletedDate === "" && registeredDate === selectedDate)
+  })
 
   const filtered = activeVisitors.filter((v) => {
     const query = searchQuery.toLowerCase()
@@ -326,7 +330,7 @@ export function AdminDashboard() {
         </header>
 
         <div className="flex flex-col gap-6">
-          <StatCards visitors={processedVisitors} activeVisitors={activeVisitors} selectedDate={selectedDate} />
+          <StatCards visitors={processedVisitors} />
 
           <section className="flex flex-col gap-4">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

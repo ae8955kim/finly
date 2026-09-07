@@ -122,7 +122,7 @@ export function VisitorStatusView({
     }
 
     void fetchIncomingMessages()
-    const interval = setInterval(() => void fetchIncomingMessages(), 3000)
+    const interval = setInterval(() => void fetchIncomingMessages(), 1000)
     return () => clearInterval(interval)
   }, [supabase, visitorId])
 

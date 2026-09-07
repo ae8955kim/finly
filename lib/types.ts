@@ -22,6 +22,8 @@ export interface Visitor {
   entered_at?: string | null
   exited_at?: string | null
   deleted_at?: string | null
+  registeredAt?: string
+  deletedAt?: string | null
   is_from_previous_day?: boolean
   created_at?: string
   memo?: string | null
