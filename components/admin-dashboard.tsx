@@ -261,8 +261,10 @@ export function AdminDashboard() {
     }
   }
 
-  function handleLogout() {
+  // Supabase 세션 초기화 및 로컬 상태 정리 로그아웃 함수
+  async function handleLogout() {
     try {
+      await supabase.auth.signOut()
       localStorage.clear()
       sessionStorage.clear()
       

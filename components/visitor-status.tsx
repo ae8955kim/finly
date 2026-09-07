@@ -1,7 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef, useCallback } from "react"
-import useSWR from "swr"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import { toast } from "sonner"
 import { Building2, MessageCircle, LogOut, Clock, CheckCircle2, ShieldAlert, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -9,16 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ChatPanel } from "@/components/chat-panel"
-
-const fetcher = async (url: string) => {
-  const res = await fetch(url)
-  if (!res.ok) {
-    const error = new Error("정보를 불러올 수 없습니다.")
-    ;(error as any).status = res.status
-    throw error
-  }
-  return res.json()
-}
+import { createClient } from "@/lib/supabase/client"
+import type { Visitor } from "@/lib/types"
 
 function formatTime(isoStr?: string | null) {
   if (!isoStr) return "-"
@@ -40,12 +31,13 @@ export function VisitorStatusView({
   visitorId: string
   onReset: () => void
 }) {
+  const [visitor, setVisitor] = useState<Visitor | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [isExiting, setIsExiting] = useState(false)
   const [now, setNow] = useState<Date | null>(null)
 
-  const lastAdminMsgIdRef = useRef<string | number | null>(null)
-  const isInitializedRef = useRef(false)
+  const supabase = useMemo(() => createClient(), [])
 
   // 1. 위변조 방지 실시간 시계 (초 단위)
   useEffect(() => {
@@ -54,119 +46,61 @@ export function VisitorStatusView({
     return () => clearInterval(timer)
   }, [])
 
-  // 2. 방문자 상세 정보 상태 폴링 (3초 간격)
-  const { data: responseData, error, mutate } = useSWR(
-    visitorId ? `/api/visitors/${visitorId}` : null,
-    fetcher,
-    { refreshInterval: 3000, revalidateOnFocus: true }
-  )
+  // 2. 방문자 상세 정보 직접 조회 함수 (Supabase Client 활용)
+  const fetchVisitorData = useCallback(async () => {
+    if (!visitorId) return
+    try {
+      const { data, error } = await supabase
+        .from("visitors")
+        .select("*")
+        .eq("id", visitorId)
+        .single()
 
-  const visitor = responseData?.visitor || responseData?.data || responseData
-  const name = visitor?.name || visitor?.visitor_name || "-"
-  const company = visitor?.company || visitor?.company_name || "-"
-  const floor = visitor?.floor || visitor?.work_floor || "-"
-  const phone = visitor?.phone || visitor?.phone_number || "-"
-  const status = visitor?.status || "pending"
-  
-  const enteredAt = visitor?.entered_at || visitor?.enteredAt
-  const exitedAt = visitor?.exited_at || visitor?.exitedAt
+      if (error || !data) {
+        throw new Error("정보를 불러올 수 없습니다.")
+      }
 
-  // 3. 관리자 삭제 감지 시 자동 초기화
-  useEffect(() => {
-    if (status === "deleted") {
-      toast.info("관리자에 의해 신청 정보가 삭제되었습니다.")
-      onReset()
-    }
+      if (data.status === "deleted") {
+        toast.info("관리자에 의해 신청 정보가 삭제되었습니다.")
+        onReset()
+        return
+      }
 
-    if (error && (error as any).status === 404) {
+      setVisitor(data)
+    } catch (err) {
+      console.error("[Visitor Status Fetch Error]:", err)
       toast.info("등록된 신청 정보가 없습니다.")
       onReset()
+    } finally {
+      setIsLoading(false)
     }
-  }, [status, error, onReset])
+  }, [visitorId, supabase, onReset])
 
-  // 4. 메시지 체크 전용 함수 (독립 동작)
-  const fetchAndCheckMessages = useCallback(async () => {
-    if (!visitorId) return
-
-    try {
-      let res = await fetch(`/api/messages?visitorId=${visitorId}`)
-      if (!res.ok) {
-        res = await fetch(`/api/visitors/${visitorId}/messages`)
-      }
-      if (!res.ok) return
-
-      const data = await res.json()
-      const msgList = Array.isArray(data)
-        ? data
-        : data.messages || data.data || []
-
-      if (!Array.isArray(msgList)) return
-
-      // 모든 관리자 전송 필드 형태 호환
-      const adminMsgs = msgList.filter((m: any) => {
-        const sender = String(m.sender || m.sender_type || m.role || "").toLowerCase()
-        return sender === "admin" || m.isAdmin === true || m.is_admin === true
-      })
-
-      if (adminMsgs.length === 0) {
-        isInitializedRef.current = true
-        return
-      }
-
-      const latestAdminMsg = adminMsgs[adminMsgs.length - 1]
-      const latestMsgId = latestAdminMsg.id || latestAdminMsg._id || latestAdminMsg.created_at || latestAdminMsg.timestamp
-
-      // 처음 렌더링될 때는 기존 메시지 ID만 등록하고 팝업 스킵
-      if (!isInitializedRef.current) {
-        lastAdminMsgIdRef.current = latestMsgId
-        isInitializedRef.current = true
-        return
-      }
-
-      // 새로운 메시지가 추가되었을 때 즉시 팝업(Toast) 출력
-      if (latestMsgId && lastAdminMsgIdRef.current !== latestMsgId) {
-        lastAdminMsgIdRef.current = latestMsgId
-
-        const contentText = latestAdminMsg.content || latestAdminMsg.message || latestAdminMsg.text || "새로운 메시지가 도착했습니다."
-
-        toast.info("💬 관리자 문의 답변", {
-          description: contentText,
-          duration: 6000,
-          action: {
-            label: "답변 확인",
-            onClick: () => setIsChatOpen(true),
-          },
-        })
-      }
-    } catch (e) {
-      // 수신 에러 발생 시 무시
-    }
-  }, [visitorId])
-
-  // 화면이 켜지자마자 메시지 수신 감지기 개시 (채팅창 열기와 무관하게 동작)
+  // 3. 폴링을 통한 실시간 상태 동기화 (3초 간격)
   useEffect(() => {
-    isInitializedRef.current = false
-    lastAdminMsgIdRef.current = null
-
-    fetchAndCheckMessages()
-    const interval = setInterval(fetchAndCheckMessages, 3000)
+    fetchVisitorData()
+    const interval = setInterval(fetchVisitorData, 3000)
     return () => clearInterval(interval)
-  }, [visitorId, fetchAndCheckMessages])
+  }, [fetchVisitorData])
 
+  // 4. 퇴실 처리 (Supabase 직접 Update)
   const handleExit = async () => {
     if (!visitorId) return
     setIsExiting(true)
     try {
-      const res = await fetch(`/api/visitors/${visitorId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "exit" }),
-      })
+      const nowIso = new Date().toISOString()
+      const { error } = await supabase
+        .from("visitors")
+        .update({
+          status: "exited",
+          exited_at: nowIso,
+        })
+        .eq("id", visitorId)
 
-      if (!res.ok) throw new Error("퇴실 처리에 실패했습니다.")
+      if (error) throw error
 
       toast.success("퇴실 처리가 완료되었습니다.")
-      mutate()
+      fetchVisitorData()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "오류가 발생했습니다.")
     } finally {
@@ -174,7 +108,7 @@ export function VisitorStatusView({
     }
   }
 
-  if (!visitor && !error) {
+  if (isLoading && !visitor) {
     return (
       <div className="flex justify-center py-12 text-sm text-muted-foreground">
         방문 신청 정보를 불러오는 중...
@@ -182,9 +116,17 @@ export function VisitorStatusView({
     )
   }
 
-  if (!visitor || status === "deleted") {
+  if (!visitor || visitor.status === "deleted") {
     return null
   }
+
+  const name = visitor.name || "-"
+  const company = visitor.company || "-"
+  const floor = visitor.floor || "-"
+  const phone = visitor.phone || "-"
+  const status = visitor.status || "pending"
+  const enteredAt = visitor.enteredAt || visitor.entered_at
+  const exitedAt = visitor.exitedAt || visitor.exited_at
 
   return (
     <div className="mx-auto max-w-md space-y-4">
