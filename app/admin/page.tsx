@@ -3,21 +3,16 @@
 import { useEffect, useState } from "react"
 import { AdminLogin } from "@/components/admin-login"
 import { AdminDashboard } from "@/components/admin-dashboard"
-import { ADMIN_COOKIE } from "@/lib/auth"
+import { isAdmin } from "@/lib/auth"
 
 export default function Page() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
 
   useEffect(() => {
-    // 저장된 쿠키 확인
-    const checkAuth = () => {
-      const cookies = document.cookie.split("; ")
-      const authCookie = cookies.find((row) => row.startsWith(`${ADMIN_COOKIE}=`))
-      if (authCookie && authCookie.split("=")[1] === "ok") {
-        setIsAuthenticated(true)
-      } else {
-        setIsAuthenticated(false)
-      }
+    // lib/auth.ts 의 isAdmin() 검증 함수 직접 활용
+    const checkAuth = async () => {
+      const loggedIn = await isAdmin()
+      setIsAuthenticated(loggedIn)
     }
 
     checkAuth()
