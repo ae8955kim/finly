@@ -2,15 +2,24 @@
 
 import type React from "react"
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Lock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { ADMIN_COOKIE } from "@/lib/auth"
+
+const TARGET_PASSWORD_HASH = "80f1a2380fdbf3b062a4d3caefd368e5dfa40c614b8a43fca3a242a420b9e84b"
+
+async function hashPassword(password: string) {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(password)
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("")
+}
 
 export function AdminLogin() {
-  const router = useRouter()
   const [password, setPassword] = useState("")
   const [submitting, setSubmitting] = useState(false)
 
@@ -18,16 +27,17 @@ export function AdminLogin() {
     e.preventDefault()
     if (submitting) return
     setSubmitting(true)
+
     try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "로그인에 실패했습니다.")
-      toast.success("로그인되었습니다.")
-      router.refresh()
+      const hashedInput = await hashPassword(password)
+
+      if (hashedInput === TARGET_PASSWORD_HASH) {
+        document.cookie = `${ADMIN_COOKIE}=ok; path=/; max-age=86400; SameSite=Lax`
+        toast.success("로그인되었습니다.")
+        window.location.reload()
+      } else {
+        throw new Error("비밀번호가 올바르지 않습니다.")
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "오류가 발생했습니다.")
       setSubmitting(false)
