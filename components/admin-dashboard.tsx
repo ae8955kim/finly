@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo } from "react"
-import useSWR from "swr"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Building2, ChevronDown, Download, LogOut, RefreshCw, Search, Users, UserCheck, X } from "lucide-react"
@@ -11,55 +10,23 @@ import { StatCards } from "./stat-cards"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getLocalDateString, getTodayString } from "@/lib/utils"
+import { createClient } from "@/lib/supabase/client" // Supabase 클라이언트 파일 경로에 맞춰 확인 필요
 import type { Visitor } from "@/lib/types"
-
-const fetcher = async (url: string) => {
-  try {
-    const res = await fetch(url)
-    
-    if (!res.ok) {
-      let errorMessage = "데이터를 불러오지 못했습니다."
-      
-      if (res.status === 404) {
-        errorMessage = "요청한 데이터를 찾을 수 없습니다."
-      } else if (res.status === 400) {
-        errorMessage = "잘못된 요청입니다."
-      } else if (res.status >= 500) {
-        errorMessage = "서버 오류가 발생했습니다."
-      }
-      
-      try {
-        const errData = await res.json()
-        if (errData.error) {
-          errorMessage = errData.error
-        }
-      } catch {
-        // JSON 파싱 실패 시 기본 메시지 사용
-      }
-      
-      console.error("[v0] API error:", { status: res.status, message: errorMessage, url })
-      throw new Error(errorMessage)
-    }
-    
-    try {
-      return await res.json()
-    } catch {
-      console.error("[v0] JSON parsing failed:", { url })
-      throw new Error("응답 데이터를 처리할 수 없습니다.")
-    }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "네트워크 오류가 발생했습니다."
-    console.error("[v0] Fetcher error:", { message, url })
-    throw err
-  }
-}
 
 export function AdminDashboard() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString())
   const [expandDeleted, setExpandDeleted] = useState(false)
-  const [showOnlyOnsite, setShowOnlyOnsite] = useState(false) // 재실 중만 보기 토글 상태
+  const [showOnlyOnsite, setShowOnlyOnsite] = useState(false)
+
+  const [visitorsData, setVisitorsData] = useState<Visitor[]>([])
+  const [deletedVisitorsData, setDeletedVisitorsData] = useState<Visitor[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Supabase 클라이언트 인스턴스 생성
+  const supabase = useMemo(() => createClient(), [])
 
   // 미래 날짜 여부 판단
   const todayStr = getTodayString()
@@ -71,6 +38,43 @@ export function AdminDashboard() {
   useEffect(() => {
     isSelectedDateTodayRef.current = selectedDate === getTodayString()
   }, [selectedDate])
+
+  // Supabase에서 방문자 데이터 직접 조회
+  const fetchVisitors = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      // 1. 삭제되지 않은 방문자 가져오기
+      const { data: active, error: activeErr } = await supabase
+        .from("visitors")
+        .select("*")
+        .neq("status", "deleted")
+        .order("registered_at", { ascending: false })
+
+      if (activeErr) throw activeErr
+
+      // 2. 삭제된 방문자 가져오기
+      const { data: deleted, error: deletedErr } = await supabase
+        .from("visitors")
+        .select("*")
+        .eq("status", "deleted")
+        .order("registered_at", { ascending: false })
+
+      if (deletedErr) throw deletedErr
+
+      setVisitorsData(active || [])
+      setDeletedVisitorsData(deleted || [])
+    } catch (err: any) {
+      console.error("[Supabase Fetch Error]:", err)
+      setError("데이터를 불러오지 못했습니다. 환경 변수나 DB 설정을 확인해주세요.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchVisitors()
+  }, [])
 
   // 자정(KST 00:00:00)에 대시보드 날짜 자동 넘김 및 데이터 갱신
   useEffect(() => {
@@ -94,9 +98,7 @@ export function AdminDashboard() {
           setSelectedDate(newToday)
         }
 
-        mutate()
-        router.refresh()
-
+        fetchVisitors()
         scheduleMidnightUpdate()
       }, msToMidnight)
     }
@@ -106,37 +108,11 @@ export function AdminDashboard() {
     return () => {
       if (timerId) clearTimeout(timerId)
     }
-  }, [router])
+  }, [])
 
-  // Fetch all visitors (non-deleted)
-  const { data, error, isLoading, mutate } = useSWR<{ visitors: Visitor[] }>(
-    "/api/visitors?updateNonExited=true",
-    fetcher,
-    { 
-      refreshInterval: 5000,
-      shouldRetryOnError: true,
-      errorRetryCount: 2,
-      errorRetryInterval: 3000,
-      fallbackData: { visitors: [] },
-    },
-  )
+  const activeVisitors = visitorsData
+  const deletedVisitors = deletedVisitorsData
 
-  // Fetch deleted visitors
-  const { data: deletedData } = useSWR<{ visitors: Visitor[] }>(
-    "/api/visitors?deleted=true",
-    fetcher,
-    { 
-      refreshInterval: 5000,
-      shouldRetryOnError: true,
-      errorRetryCount: 2,
-      errorRetryInterval: 3000,
-      fallbackData: { visitors: [] },
-    },
-  )
-
-  const activeVisitors = (data?.visitors ?? []).filter((v) => v.status !== "deleted")
-  const deletedVisitors = deletedData?.visitors ?? []
-  
   // 1. 검색어 필터링
   const filtered = activeVisitors.filter((v) => {
     const query = searchQuery.toLowerCase()
@@ -149,7 +125,6 @@ export function AdminDashboard() {
 
   // 2. 날짜별 필터링 및 표기 가공 로직
   const processedVisitors = useMemo(() => {
-    // 미래 날짜 선택 시 빈 배열 반환
     if (isFutureDate) return []
 
     return filtered
@@ -243,7 +218,6 @@ export function AdminDashboard() {
     return processedVisitors
   }, [processedVisitors, showOnlyOnsite])
 
-  // 현재 날짜 조회 목록 기준 재실 중 인원 수
   const onsiteCount = processedVisitors.filter((v) => v.status === "onsite").length
 
   // 엑셀 다운로드 기능
@@ -300,24 +274,12 @@ export function AdminDashboard() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "다운로드에 실패했습니다."
       toast.error(message)
-      console.error("[v0] Download error:", err)
     }
   }
 
-  async function handleLogout() {
-    try {
-      const res = await fetch("/api/admin/login", { method: "DELETE" })
-      
-      if (!res.ok) {
-        console.warn("[v0] Logout API returned non-ok status:", res.status)
-      }
-      
-      toast.success("로그아웃되었습니다.")
-      router.refresh()
-    } catch (err) {
-      console.error("[v0] Logout error:", err)
-      toast.error("로그아웃 중 오류가 발생했습니다.")
-    }
+  function handleLogout() {
+    toast.success("로그아웃되었습니다.")
+    router.push("/login")
   }
 
   return (
@@ -334,7 +296,7 @@ export function AdminDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => mutate()}>
+            <Button variant="outline" size="sm" onClick={fetchVisitors}>
               <RefreshCw className="size-4" />
               새로고침
             </Button>
@@ -346,7 +308,6 @@ export function AdminDashboard() {
         </header>
 
         <div className="flex flex-col gap-6">
-          {/* StatCards에는 필터링 전 전체 데이터인 processedVisitors 전달 */}
           <StatCards visitors={processedVisitors} activeVisitors={activeVisitors} selectedDate={selectedDate} />
 
           <section className="flex flex-col gap-4">
@@ -384,7 +345,6 @@ export function AdminDashboard() {
                   )}
                 </div>
 
-                {/* 재실 중만 보기 버튼 */}
                 <Button
                   variant={showOnlyOnsite ? "default" : "outline"}
                   size="sm"
@@ -414,7 +374,7 @@ export function AdminDashboard() {
 
             {error ? (
               <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-                데이터를 불러오지 못했습니다. 새로고침을 눌러 다시 시도해 주세요.
+                {error}
               </div>
             ) : isLoading ? (
               <div className="rounded-xl border border-border py-16 text-center text-sm text-muted-foreground">
@@ -436,12 +396,11 @@ export function AdminDashboard() {
                     {searchQuery ? `검색결과: ${visitors.length}명` : `총 ${visitors.length}명`}
                   </span>
                 </div>
-                <VisitorTable visitors={visitors} onMutate={() => mutate()} />
+                <VisitorTable visitors={visitors} onMutate={fetchVisitors} />
               </>
             )}
           </section>
 
-          {/* Collapsed Section: Deleted Visitors */}
           <section className="flex flex-col gap-4">
             <button
               onClick={() => setExpandDeleted(!expandDeleted)}
@@ -462,9 +421,7 @@ export function AdminDashboard() {
                     삭제된 인원이 없습니다.
                   </div>
                 ) : (
-                  <DeletedVisitorsTable visitors={deletedVisitors} onMutate={() => {
-                    mutate()
-                  }} />
+                  <DeletedVisitorsTable visitors={deletedVisitors} onMutate={fetchVisitors} />
                 )}
               </div>
             )}
