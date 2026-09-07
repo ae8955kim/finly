@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ADMIN_COOKIE } from "@/lib/auth"
 
+
 const TARGET_PASSWORD_HASH = "80f1a2380fdbf3b062a4d3caefd368e5dfa40c614b8a43fca3a242a420b9e84b"
 
 async function hashPassword(password: string) {
@@ -32,12 +33,9 @@ export function AdminLogin() {
       const hashedInput = await hashPassword(password)
 
       if (hashedInput === TARGET_PASSWORD_HASH) {
-        // 쿠키 저장 (path=/ 도메인 전체 적용)
         document.cookie = `${ADMIN_COOKIE}=ok; path=/; max-age=86400; SameSite=Lax`
         toast.success("로그인되었습니다.")
-        
-        // basePath 환경에서 확실한 화면 갱신
-        window.location.href = window.location.pathname
+        window.location.reload()
       } else {
         throw new Error("비밀번호가 올바르지 않습니다.")
       }
