@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useRef, useMemo } from "react"
 import { toast } from "sonner"
-import { Building2, ChevronDown, Download, LogOut, RefreshCw, Search, Users, UserCheck, X } from "lucide-react"
+import { Building2, ChevronDown, Download, LogOut, RefreshCw, Search, Users, UserCheck, X, Megaphone } from "lucide-react"
 import { VisitorTable } from "./visitor-table"
 import { DeletedVisitorsTable } from "./deleted-visitors-table"
 import { StatCards } from "./stat-cards"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { getLocalDateString, getTodayString } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import type { Visitor } from "@/lib/types"
@@ -17,6 +19,9 @@ export function AdminDashboard() {
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString())
   const [expandDeleted, setExpandDeleted] = useState(false)
   const [showOnlyOnsite, setShowOnlyOnsite] = useState(false)
+  const [announcementOpen, setAnnouncementOpen] = useState(false)
+  const [announcementText, setAnnouncementText] = useState("")
+  const [sendingAnnouncement, setSendingAnnouncement] = useState(false)
 
   const [visitorsData, setVisitorsData] = useState<Visitor[]>([])
   const [deletedVisitorsData, setDeletedVisitorsData] = useState<Visitor[]>([])
@@ -122,7 +127,11 @@ export function AdminDashboard() {
   }, [])
 
   const activeVisitors = visitorsData
-  const deletedVisitors = deletedVisitorsData
+  const deletedVisitors = deletedVisitorsData.filter((visitor) => {
+    const deletedDate = getLocalDateString(visitor.deletedAt || visitor.deleted_at)
+    const registeredDate = getLocalDateString(visitor.registeredAt || visitor.registered_at)
+    return deletedDate === selectedDate || (deletedDate === "" && registeredDate === selectedDate)
+  })
 
   const filtered = activeVisitors.filter((v) => {
     const query = searchQuery.toLowerCase()
@@ -225,6 +234,42 @@ export function AdminDashboard() {
 
   const onsiteCount = processedVisitors.filter((v) => v.status === "onsite").length
 
+  async function sendAnnouncement() {
+    const message = announcementText.trim()
+    const onsiteVisitors = visitorsData.filter((visitor) => visitor.status === "onsite")
+
+    if (!message) {
+      toast.error("공지 내용을 입력해주세요.")
+      return
+    }
+    if (onsiteVisitors.length === 0) {
+      toast.info("현재 재실 중인 공사자가 없습니다.")
+      return
+    }
+
+    setSendingAnnouncement(true)
+    try {
+      const { error } = await supabase.from("chat_messages").insert(
+        onsiteVisitors.map((visitor) => ({
+          visitor_id: visitor.id,
+          sender: "admin",
+          text: `[공지] ${message}`,
+          is_read: false,
+        })),
+      )
+      if (error) throw error
+
+      toast.success(`${onsiteVisitors.length}명에게 공지를 전송했습니다.`)
+      setAnnouncementText("")
+      setAnnouncementOpen(false)
+    } catch (error) {
+      console.error("[v0] Announcement send error:", error)
+      toast.error("공지 전송에 실패했습니다.")
+    } finally {
+      setSendingAnnouncement(false)
+    }
+  }
+
   function downloadExcel() {
     try {
       if (!activeVisitors || activeVisitors.length === 0) {
@@ -314,6 +359,10 @@ export function AdminDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setAnnouncementOpen(true)}>
+              <Megaphone className="size-4" />
+              재실자 공지
+            </Button>
             <Button variant="outline" size="sm" onClick={fetchVisitors}>
               <RefreshCw className="size-4" />
               새로고침
@@ -326,7 +375,7 @@ export function AdminDashboard() {
         </header>
 
         <div className="flex flex-col gap-6">
-          <StatCards visitors={processedVisitors} activeVisitors={activeVisitors} selectedDate={selectedDate} />
+          <StatCards visitors={processedVisitors} />
 
           <section className="flex flex-col gap-4">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -445,6 +494,32 @@ export function AdminDashboard() {
             )}
           </section>
         </div>
+        <Dialog open={announcementOpen} onOpenChange={setAnnouncementOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>재실 중인 공사자에게 공지</DialogTitle>
+              <DialogDescription>
+                현재 재실 중인 {visitorsData.filter((visitor) => visitor.status === "onsite").length}명에게 공지가 전송됩니다.
+              </DialogDescription>
+            </DialogHeader>
+            <Textarea
+              value={announcementText}
+              onChange={(event) => setAnnouncementText(event.target.value)}
+              placeholder="공지 내용을 입력하세요."
+              rows={5}
+              maxLength={500}
+              autoFocus
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAnnouncementOpen(false)} disabled={sendingAnnouncement}>
+                취소
+              </Button>
+              <Button onClick={sendAnnouncement} disabled={sendingAnnouncement || !announcementText.trim()}>
+                {sendingAnnouncement ? "전송 중..." : "공지 전송"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </main>
   )

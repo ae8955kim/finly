@@ -80,7 +80,7 @@ function VisitorRow({
 
   useEffect(() => {
     fetchMessages()
-    const interval = setInterval(fetchMessages, isChatOpen ? 3000 : 8000)
+    const interval = setInterval(fetchMessages, isChatOpen ? 1000 : 1000)
     return () => clearInterval(interval)
   }, [fetchMessages, isChatOpen])
 
