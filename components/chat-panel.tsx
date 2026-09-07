@@ -47,6 +47,7 @@ export function ChatPanel({ visitorId, viewpoint, className, onNewMessage }: Cha
   const key = useMemo(() => ["chat_messages", visitorId] as const, [visitorId])
   const { data, mutate } = useSWR(key, ([, id]) => fetchMessages(id), {
     revalidateOnFocus: false,
+    refreshInterval: 3000,
   })
   const [text, setText] = useState("")
   const [sending, setSending] = useState(false)

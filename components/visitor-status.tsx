@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useMemo } from "react"
+import { useEffect, useState, useCallback, useMemo, useRef } from "react"
 import { toast } from "sonner"
 import { Building2, MessageCircle, LogOut, Clock, CheckCircle2, ShieldAlert, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -36,6 +36,8 @@ export function VisitorStatusView({
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [isExiting, setIsExiting] = useState(false)
   const [now, setNow] = useState<Date | null>(null)
+  const seenMessageIds = useRef<Set<string>>(new Set())
+  const initializedMessages = useRef(false)
 
   const supabase = useMemo(() => createClient(), [])
 
@@ -82,6 +84,47 @@ export function VisitorStatusView({
     const interval = setInterval(fetchVisitorData, 3000)
     return () => clearInterval(interval)
   }, [fetchVisitorData])
+
+  // 채팅창을 열지 않아도 관리자 메시지를 감지해 즉시 알립니다.
+  useEffect(() => {
+    if (!visitorId) return
+
+    const fetchIncomingMessages = async () => {
+      const { data, error } = await supabase
+        .from("chat_messages")
+        .select("id, visitor_id, sender, text, created_at, is_read")
+        .eq("visitor_id", visitorId)
+        .eq("sender", "admin")
+        .eq("is_read", false)
+        .order("created_at", { ascending: true })
+
+      if (error || !data) return
+
+      const unread = data as Array<{ id: string; text?: string; content?: string }>
+      if (initializedMessages.current) {
+        const incoming = unread.find((message) => !seenMessageIds.current.has(String(message.id)))
+        if (incoming) {
+          toast.info("관리자 메시지가 도착했습니다", {
+            description: incoming.text || incoming.content || "새 메시지를 확인해 주세요.",
+            duration: 10000,
+            className: "border-2 border-blue-600 bg-white text-slate-950 shadow-xl",
+            descriptionClassName: "text-slate-700",
+            action: {
+              label: "메시지 열기",
+              onClick: () => setIsChatOpen(true),
+            },
+          })
+        }
+      }
+
+      seenMessageIds.current = new Set(unread.map((message) => String(message.id)))
+      initializedMessages.current = true
+    }
+
+    void fetchIncomingMessages()
+    const interval = setInterval(() => void fetchIncomingMessages(), 3000)
+    return () => clearInterval(interval)
+  }, [supabase, visitorId])
 
   // 4. 퇴실 처리 (Supabase 직접 Update)
   const handleExit = async () => {

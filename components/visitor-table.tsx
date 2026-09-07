@@ -125,7 +125,7 @@ function VisitorRow({
   const markAsRead = useCallback(async () => {
     try {
       await supabase
-        .from("messages")
+      .from("chat_messages")
         .update({ is_read: true })
         .eq("visitor_id", visitor.id)
         .eq("sender", "worker")
