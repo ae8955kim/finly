@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export', // 이 옵션이 필수입니다!
+  output: 'export',
+  basePath: '/manage', // GitHub Pages 서브경로(리포지토리 이름) 지정
   typescript: {
     ignoreBuildErrors: true,
   },
