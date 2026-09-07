@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { ChatPanel } from "@/components/chat-panel"
 import { createClient } from "@/lib/supabase/client"
 import type { Visitor } from "@/lib/types"
@@ -36,6 +37,7 @@ export function VisitorStatusView({
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [isExiting, setIsExiting] = useState(false)
   const [now, setNow] = useState<Date | null>(null)
+  const [announcement, setAnnouncement] = useState<{ id: string; text: string; created_at: string } | null>(null)
   const seenMessageIds = useRef<Set<string>>(new Set())
   const initializedMessages = useRef(false)
 
@@ -104,16 +106,25 @@ export function VisitorStatusView({
       if (initializedMessages.current) {
         const incoming = unread.find((message) => !seenMessageIds.current.has(String(message.id)))
         if (incoming) {
-          toast.info("관리자 메시지가 도착했습니다", {
-            description: incoming.text || incoming.content || "새 메시지를 확인해 주세요.",
-            duration: 10000,
-            className: "border-2 border-blue-600 bg-white text-slate-950 shadow-xl",
-            descriptionClassName: "text-slate-700",
-            action: {
-              label: "메시지 열기",
-              onClick: () => setIsChatOpen(true),
-            },
-          })
+          const incomingText = incoming.text || incoming.content || "새 메시지를 확인해 주세요."
+          if (incomingText.startsWith("[공지]")) {
+            setAnnouncement({
+              id: String(incoming.id),
+              text: incomingText.replace(/^\[공지\]\s*/, ""),
+              created_at: String((incoming as { created_at?: string }).created_at || new Date().toISOString()),
+            })
+          } else {
+            toast.info("관리자 메시지가 도착했습니다", {
+              description: incomingText,
+              duration: 10000,
+              className: "border-2 border-blue-600 bg-white text-slate-950 shadow-xl",
+              descriptionClassName: "text-slate-700",
+              action: {
+                label: "메시지 열기",
+                onClick: () => setIsChatOpen(true),
+              },
+            })
+          }
         }
       }
 
@@ -125,6 +136,23 @@ export function VisitorStatusView({
     const interval = setInterval(() => void fetchIncomingMessages(), 1000)
     return () => clearInterval(interval)
   }, [supabase, visitorId])
+
+  const acknowledgeAnnouncement = async () => {
+    if (!announcement) return
+
+    const { error } = await supabase
+      .from("chat_messages")
+      .update({ is_read: true })
+      .eq("id", announcement.id)
+      .eq("visitor_id", visitorId)
+
+    if (error) {
+      toast.error("공지 확인 처리에 실패했습니다.")
+      return
+    }
+
+    setAnnouncement(null)
+  }
 
   // 4. 퇴실 처리 (Supabase 직접 Update)
   const handleExit = async () => {
@@ -173,6 +201,29 @@ export function VisitorStatusView({
 
   return (
     <div className="mx-auto max-w-md space-y-4">
+      <AlertDialog open={Boolean(announcement)} onOpenChange={() => undefined}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>관리자 공지</AlertDialogTitle>
+            <AlertDialogDescription className="whitespace-pre-wrap text-base leading-relaxed text-slate-700">
+              {announcement?.text}
+              {announcement?.created_at && (
+                <span className="mt-3 block text-xs text-slate-500">
+                  전송 시각: {new Date(announcement.created_at).toLocaleString("ko-KR", {
+                    timeZone: "Asia/Seoul",
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  })}
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={acknowledgeAnnouncement}>확인했습니다.</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* 위변조 방지 시계 */}
       <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/10 px-4 py-2.5 text-xs text-primary shadow-sm">
         <div className="flex items-center gap-1.5 font-medium">
