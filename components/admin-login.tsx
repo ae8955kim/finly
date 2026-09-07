@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ADMIN_COOKIE } from "@/lib/auth"
 
-
 const TARGET_PASSWORD_HASH = "80f1a2380fdbf3b062a4d3caefd368e5dfa40c614b8a43fca3a242a420b9e84b"
 
 async function hashPassword(password: string) {
@@ -33,9 +32,16 @@ export function AdminLogin() {
       const hashedInput = await hashPassword(password)
 
       if (hashedInput === TARGET_PASSWORD_HASH) {
+        // GitHub Pages basePath (/manage) 고려하여 쿠키 path 동적 설정 및 root path 동시 저장
+        document.cookie = `${ADMIN_COOKIE}=ok; path=/manage; max-age=86400; SameSite=Lax`
         document.cookie = `${ADMIN_COOKIE}=ok; path=/; max-age=86400; SameSite=Lax`
+
         toast.success("로그인되었습니다.")
-        window.location.reload()
+
+        // 쿠키 쓰기 완료를 위해 100ms 지연 후 재로드
+        setTimeout(() => {
+          window.location.reload()
+        }, 100)
       } else {
         throw new Error("비밀번호가 올바르지 않습니다.")
       }
