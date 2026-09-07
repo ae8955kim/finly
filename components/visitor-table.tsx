@@ -68,7 +68,7 @@ function VisitorRow({
 
   const fetchMessages = useCallback(async () => {
     const { data, error } = await supabase
-      .from("messages")
+      .from("chat_messages")
       .select("*")
       .eq("visitor_id", visitor.id)
       .order("created_at", { ascending: true })
