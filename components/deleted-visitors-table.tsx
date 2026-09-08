@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { toast } from "sonner"
 import { RotateCcw } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { FloorBadges } from "@/components/floor-picker"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -34,6 +36,7 @@ export function DeletedVisitorsTable({
   onMutate: () => void
 }) {
   const [pendingId, setPendingId] = useState<string | null>(null)
+  const [floorVisitor, setFloorVisitor] = useState<Visitor | null>(null)
 
   async function handleRestore(id: string) {
     setPendingId(id)
@@ -74,13 +77,15 @@ export function DeletedVisitorsTable({
   }
 
   return (
+    <>
+    <Dialog open={floorVisitor !== null} onOpenChange={(open) => !open && setFloorVisitor(null)}><DialogContent><DialogHeader><DialogTitle>{floorVisitor?.name ?? "공사자"} · 작업층</DialogTitle></DialogHeader>{floorVisitor && <FloorBadges value={floorVisitor.floor ?? ""} />}</DialogContent></Dialog>
     <div className="overflow-hidden rounded-xl border border-border">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50 hover:bg-muted/50">
             <TableHead>이름</TableHead>
             <TableHead>소속</TableHead>
-            <TableHead>작업층</TableHead>
+            <TableHead>작업층 확인</TableHead>
             <TableHead className="hidden lg:table-cell">전화번호</TableHead>
             <TableHead className="text-center">등록일</TableHead>
             <TableHead className="text-center">삭제일</TableHead>
@@ -94,7 +99,7 @@ export function DeletedVisitorsTable({
               <TableRow key={v.id}>
                 <TableCell className="font-medium">{v.name ?? "-"}</TableCell>
                 <TableCell className="text-muted-foreground">{v.company ?? "-"}</TableCell>
-                <TableCell className="text-muted-foreground">{v.floor ?? "-"}</TableCell>
+                <TableCell><Button size="sm" variant="outline" onClick={() => setFloorVisitor(v)}>작업층 확인</Button></TableCell>
                 <TableCell className="hidden font-mono text-xs text-muted-foreground lg:table-cell">
                   {v.phone ?? "-"}
                 </TableCell>
@@ -121,5 +126,6 @@ export function DeletedVisitorsTable({
         </TableBody>
       </Table>
     </div>
+    </>
   )
 }
