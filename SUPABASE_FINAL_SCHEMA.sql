@@ -129,6 +129,18 @@ CREATE TRIGGER update_chat_messages_updated_at
   EXECUTE FUNCTION public.update_updated_at_column();
 
 -- ============================================================================
+-- 3개월 보존 정책: 한국시간 기준 매일 00:10에 만료 데이터를 삭제하도록 pg_cron에서 호출할 수 있습니다.
+ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN NOT NULL DEFAULT false;
+
+CREATE OR REPLACE FUNCTION public.delete_expired_visitor_records()
+RETURNS void
+LANGUAGE sql
+SECURITY INVOKER
+AS $$
+  DELETE FROM public.visitors
+  WHERE COALESCE(deleted_at, exited_at, registered_at) < ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date - INTERVAL '3 months');
+$$;
+
 -- 완료
 -- ============================================================================
 -- 모든 테이블이 생성되었습니다.

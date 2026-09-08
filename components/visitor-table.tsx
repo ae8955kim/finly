@@ -22,6 +22,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { ChatPanel } from "@/components/chat-panel"
+import { FloorBadges } from "@/components/floor-picker"
 import type { Visitor, ChatMessage } from "@/lib/types"
 import { createClient } from "@/lib/supabase/client"
 
@@ -54,6 +55,7 @@ function VisitorRow({
   onAct,
   onOpenChat,
   onOpenMemo,
+  onOpenFloors,
   isChatOpen,
 }: {
   visitor: Visitor & { displayEnteredAt?: string; displayExitedAt?: string }
@@ -61,6 +63,7 @@ function VisitorRow({
   onAct: (id: string, action: "approve" | "exit" | "delete" | "restore") => void
   onOpenChat: (visitor: Visitor) => void
   onOpenMemo: (visitor: Visitor) => void
+  onOpenFloors: (visitor: Visitor) => void
   isChatOpen: boolean
 }) {
   const meta = STATUS_META[visitor.status] || STATUS_META.pending
@@ -148,7 +151,7 @@ function VisitorRow({
     <TableRow>
       <TableCell className="font-medium">{visitor.name ?? "-"}</TableCell>
       <TableCell className="text-muted-foreground">{visitor.company ?? "-"}</TableCell>
-      <TableCell className="text-muted-foreground">{visitor.floor ?? "-"}</TableCell>
+      <TableCell><Button type="button" variant="ghost" size="sm" className="h-auto justify-start px-1 text-left" onClick={() => onOpenFloors(visitor)} title="작업층 확인"><FloorBadges value={visitor.floor ?? ""} /></Button></TableCell>
       <TableCell className="hidden font-mono text-xs text-muted-foreground lg:table-cell">
         {visitor.phone ?? "-"}
       </TableCell>
@@ -270,6 +273,7 @@ export function VisitorTable({
 }) {
   const [pendingId, setPendingId] = useState<string | null>(null)
   const [chatWith, setChatWith] = useState<Visitor | null>(null)
+  const [floorVisitor, setFloorVisitor] = useState<Visitor | null>(null)
   
   const [memoVisitor, setMemoVisitor] = useState<Visitor | null>(null)
   const [memoText, setMemoText] = useState("")
@@ -382,12 +386,15 @@ export function VisitorTable({
                 onAct={act}
                 onOpenChat={(visitor) => setChatWith(visitor)}
                 onOpenMemo={handleOpenMemo}
+                onOpenFloors={(visitor) => setFloorVisitor(visitor)}
                 isChatOpen={chatWith?.id === v.id}
               />
             ))}
           </TableBody>
         </Table>
       </div>
+
+      <Dialog open={floorVisitor !== null} onOpenChange={(open) => !open && setFloorVisitor(null)}><DialogContent><DialogHeader><DialogTitle>{floorVisitor ? `${floorVisitor.name} · 작업층` : "작업층"}</DialogTitle></DialogHeader>{floorVisitor && <FloorBadges value={floorVisitor.floor ?? ""} />}</DialogContent></Dialog>
 
       <Dialog open={chatWith !== null} onOpenChange={(open) => !open && setChatWith(null)}>
         <DialogContent className="flex max-h-[80vh] flex-col gap-4 sm:max-w-md">

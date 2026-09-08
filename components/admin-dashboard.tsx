@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { getLocalDateString, getTodayString } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import type { Visitor } from "@/lib/types"
+import { FloorBadges } from "@/components/floor-picker"
 
 export function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -22,6 +23,7 @@ export function AdminDashboard() {
   const [announcementOpen, setAnnouncementOpen] = useState(false)
   const [announcementText, setAnnouncementText] = useState("")
   const [sendingAnnouncement, setSendingAnnouncement] = useState(false)
+  const [floorsOpen, setFloorsOpen] = useState(false)
 
   const [visitorsData, setVisitorsData] = useState<Visitor[]>([])
   const [deletedVisitorsData, setDeletedVisitorsData] = useState<Visitor[]>([])
@@ -359,10 +361,8 @@ export function AdminDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setAnnouncementOpen(true)}>
-              <Megaphone className="size-4" />
-              재실자 공지
-            </Button>
+            <Button variant="outline" size="sm" onClick={() => setFloorsOpen(true)}>현재 작업 중인 모든 층 확인</Button>
+            <Button variant="outline" size="sm" onClick={() => setAnnouncementOpen(true)}><Megaphone className="size-4" />재실자 공지</Button>
             <Button variant="outline" size="sm" onClick={fetchVisitors}>
               <RefreshCw className="size-4" />
               새로고침
@@ -494,6 +494,8 @@ export function AdminDashboard() {
             )}
           </section>
         </div>
+        <Dialog open={floorsOpen} onOpenChange={setFloorsOpen}><DialogContent><DialogHeader><DialogTitle>현재 작업 중인 모든 층</DialogTitle><DialogDescription>재실 중인 공사자 {visitorsData.filter((visitor) => visitor.status === "onsite").length}명의 작업층입니다.</DialogDescription></DialogHeader><div className="space-y-3">{visitorsData.filter((visitor) => visitor.status === "onsite").map((visitor) => <div key={visitor.id} className="rounded-lg border p-3"><p className="mb-2 text-sm font-semibold">{visitor.name} · {visitor.company}</p><FloorBadges value={visitor.floor} /></div>)}</div></DialogContent></Dialog>
+
         <Dialog open={announcementOpen} onOpenChange={setAnnouncementOpen}>
           <DialogContent>
             <DialogHeader>

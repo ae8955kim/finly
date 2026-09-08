@@ -11,6 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescript
 import { ChatPanel } from "@/components/chat-panel"
 import { createClient } from "@/lib/supabase/client"
 import type { Visitor } from "@/lib/types"
+import { FloorBadges } from "@/components/floor-picker"
 
 function formatTime(isoStr?: string | null) {
   if (!isoStr) return "-"
@@ -292,10 +293,7 @@ export function VisitorStatusView({
               <span className="text-muted-foreground">소속</span>
               <span className="font-medium">{company}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">작업층</span>
-              <span className="font-medium">{floor}</span>
-            </div>
+            <div className="space-y-2"><span className="block text-muted-foreground">작업층 (고정)</span><FloorBadges value={floor} /></div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">연락처</span>
               <span className="font-mono">{phone}</span>
