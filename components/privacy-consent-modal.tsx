@@ -50,11 +50,7 @@ export function PrivacyConsentModal({
             {/* 보유 기간 */}
             <section>
               <h3 className="font-semibold mb-2">3. 보유 및 이용 기간</h3>
-              <p className="text-muted-foreground">
-                • <strong>기본 보유기간</strong>: 출입 당일 종료 시\n
-                • <strong>법정 보유기간</strong>: 관련 법령(시설관리법 등)에 따라 필요 시 최대 6개월\n
-                • <strong>자동 삭제</strong>: 보유기간 종료 후 자동으로 완전 삭제됨
-              </p>
+              <div className="space-y-1 text-muted-foreground"><p>• <strong>기본 보유기간</strong>: 출입 당일 종료 시</p><p>• <strong>법정 보유기간 및 자동 삭제</strong>: 관련 법령 및 방침에 따라 공사 종료 후 3개월까지만 보유하며, 보유 기간 경과 후 자동으로 완전 삭제됩니다.</p></div>
             </section>
 
             {/* 권리 */}
@@ -79,8 +75,7 @@ export function PrivacyConsentModal({
             <section>
               <h3 className="font-semibold mb-2">6. 개인정보 담당자</h3>
               <p className="text-muted-foreground">
-                개인정보 보호 및 고충처리 관련 문의사항은\n
-                관리자 대시보드에서 확인 가능합니다.
+                개인정보 보호 및 고충처리 관련 문의사항은 02-2255-4111 혹은 시스템 내 '관리자 문의하기' 기능을 통해 문의해 주시기 바랍니다.
               </p>
             </section>
           </div>

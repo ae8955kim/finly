@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { HardHat } from "lucide-react"
 import { PrivacyConsentModal } from "@/components/privacy-consent-modal"
 import { createClient } from "@/lib/supabase/client"
+import { FloorPicker } from "@/components/floor-picker"
 
 const EMPTY = { name: "", floor: "", company: "", phone: "" }
 
@@ -72,7 +73,7 @@ export function VisitorForm({ onRegistered }: { onRegistered: (visitorId: string
       <form onSubmit={handleSubmit} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
         <div className="mb-6 flex flex-col gap-4">
           <Field id="name" label="이름" value={form.name} onChange={update("name")} placeholder="홍길동" autoComplete="name" />
-          <Field id="floor" label="작업층" value={form.floor} onChange={update("floor")} placeholder="예) 지하 2층, 5층" />
+          <div className="flex flex-col gap-2"><Label htmlFor="floor">작업층</Label><FloorPicker value={form.floor} onChange={(floor) => setForm((current) => ({ ...current, floor }))} label="작업층 선택" /></div>
           <Field id="company" label="소속" value={form.company} onChange={update("company")} placeholder="예) OO건설" />
           <Field
             id="phone"
