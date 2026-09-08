@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 export const FLOOR_OPTIONS = [
-  ...Array.from({ length: 8 }, (_, index) => `지하 ${8 - index}층`),
-  ...[1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12].map((floor) => `${floor}층`),
-  ...Array.from({ length: 29 }, (_, index) => `${index + 14}층`),
-  "P1층",
   "P2층",
+  "P1층",
+  ...Array.from({ length: 42 }, (_, index) => `${42 - index}층`),
+  ...Array.from({ length: 8 }, (_, index) => `지하 ${index + 1}층`),
+  "외부",
 ]
 
 export function parseFloors(value: string) { return value.split(",").map((item) => item.trim()).filter(Boolean) }
@@ -21,6 +21,7 @@ export function sortFloors(floors: string[]) {
     if (basement) return -Number(basement[1])
     const parking = floor.match(/^P(\d+)층$/i)
     if (parking) return 1000 + Number(parking[1])
+    if (floor === "외부") return -10000
     const above = floor.match(/^(\d+)층$/)
     return above ? Number(above[1]) : -9999
   }
