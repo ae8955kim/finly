@@ -203,10 +203,10 @@ export function VisitorStatusView({
   return (
     <div className="mx-auto w-full max-w-md min-w-0 space-y-4 overflow-x-hidden">
       <AlertDialog open={Boolean(announcement)} onOpenChange={() => undefined}>
-        <AlertDialogContent>
+        <AlertDialogContent className="border-2 border-amber-400 bg-slate-950 text-white shadow-2xl shadow-black/60 sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>관리자 공지</AlertDialogTitle>
-            <AlertDialogDescription className="whitespace-pre-wrap text-base leading-relaxed text-slate-700">
+            <AlertDialogTitle className="text-xl font-bold text-amber-300">관리자 공지</AlertDialogTitle>
+            <AlertDialogDescription className="whitespace-pre-wrap text-base font-medium leading-relaxed text-white">
               {announcement?.text}
               {announcement?.created_at && (
                 <span className="mt-3 block text-xs text-slate-500">
@@ -220,7 +220,7 @@ export function VisitorStatusView({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={acknowledgeAnnouncement}>확인했습니다.</AlertDialogAction>
+            <AlertDialogAction className="w-full bg-amber-400 font-bold text-slate-950 hover:bg-amber-300" onClick={acknowledgeAnnouncement}>확인했습니다.</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -255,7 +255,7 @@ export function VisitorStatusView({
             <Building2 className="size-6" />
           </div>
           <CardTitle className="text-xl font-bold">{name} 님</CardTitle>
-          <CardDescription className="text-foreground/70">{company} · {floor}</CardDescription>
+          <CardDescription className="text-foreground/70">{company}</CardDescription>
           
           <div className="pt-2 flex justify-center">
             {status === "pending" && (
