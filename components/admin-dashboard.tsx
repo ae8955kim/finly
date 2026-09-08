@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { getLocalDateString, getTodayString } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import type { Visitor } from "@/lib/types"
-import { FloorBadges } from "@/components/floor-picker"
+import { FloorBadges, parseFloors, sortFloors } from "@/components/floor-picker"
 
 export function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -348,7 +348,7 @@ export function AdminDashboard() {
   }
 
   return (
-    <main className="w-full min-h-screen bg-background">
+    <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-background">
       <div className="mx-auto w-full px-4 py-8 sm:px-6">
         <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -494,7 +494,7 @@ export function AdminDashboard() {
             )}
           </section>
         </div>
-        <Dialog open={floorsOpen} onOpenChange={setFloorsOpen}><DialogContent><DialogHeader><DialogTitle>현재 작업 중인 모든 층</DialogTitle><DialogDescription>재실 중인 공사자 {visitorsData.filter((visitor) => visitor.status === "onsite").length}명의 작업층입니다.</DialogDescription></DialogHeader><div className="space-y-3">{visitorsData.filter((visitor) => visitor.status === "onsite").map((visitor) => <div key={visitor.id} className="rounded-lg border p-3"><p className="mb-2 text-sm font-semibold">{visitor.name} · {visitor.company}</p><FloorBadges value={visitor.floor} /></div>)}</div></DialogContent></Dialog>
+        <Dialog open={floorsOpen} onOpenChange={setFloorsOpen}><DialogContent className="max-h-[85vh] overflow-y-auto"><DialogHeader><DialogTitle>현재 작업 중인 모든 층</DialogTitle><DialogDescription>재실 중인 공사자들이 선택한 작업층을 통합해 보여드립니다.</DialogDescription></DialogHeader><div className="rounded-xl border border-primary/20 bg-primary/5 p-4"><div className="flex flex-wrap gap-2">{sortFloors(Array.from(new Set(visitorsData.filter((visitor) => visitor.status === "onsite").flatMap((visitor) => parseFloors(visitor.floor || ""))))).map((floor) => <span key={floor} className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground">{floor}</span>)}</div></div></DialogContent></Dialog>
 
         <Dialog open={announcementOpen} onOpenChange={setAnnouncementOpen}>
           <DialogContent>

@@ -11,7 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescript
 import { ChatPanel } from "@/components/chat-panel"
 import { createClient } from "@/lib/supabase/client"
 import type { Visitor } from "@/lib/types"
-import { FloorBadges } from "@/components/floor-picker"
+import { FloorBadges, sortFloors } from "@/components/floor-picker"
 
 function formatTime(isoStr?: string | null) {
   if (!isoStr) return "-"
@@ -201,7 +201,7 @@ export function VisitorStatusView({
   const exitedAt = visitor.exitedAt || visitor.exited_at
 
   return (
-    <div className="mx-auto max-w-md space-y-4">
+    <div className="mx-auto w-full max-w-md min-w-0 space-y-4 overflow-x-hidden">
       <AlertDialog open={Boolean(announcement)} onOpenChange={() => undefined}>
         <AlertDialogContent>
           <AlertDialogHeader>
