@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useState } from "react"
 import { Check, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -30,11 +30,10 @@ export function sortFloors(floors: string[]) {
 export function FloorPicker({ value, onChange, label = "작업층 확인" }: { value: string; onChange: (value: string) => void; label?: string }) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<string[]>(parseFloors(value))
-  const dragging = useRef(false)
   function toggle(floor: string) { setDraft((current) => current.includes(floor) ? current.filter((item) => item !== floor) : [...current, floor]) }
   return <>
     <Button type="button" variant="outline" onClick={() => { setDraft(parseFloors(value)); setOpen(true) }} className="w-full justify-between"><span className="truncate text-left">{value || label}</span><ChevronDown className="size-4 shrink-0" /></Button>
-    <Dialog open={open} onOpenChange={setOpen}><DialogContent className="flex max-h-[90dvh] max-w-lg flex-col overflow-hidden p-4 sm:p-6"><DialogHeader><DialogTitle>{label}</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">층을 누르거나 손가락으로 드래그해 여러 층을 선택하세요.</p><div className="grid max-h-[55vh] grid-cols-3 gap-2 overflow-y-auto overscroll-contain px-1 pb-2 select-none touch-pan-y sm:grid-cols-4" onPointerUp={() => { dragging.current = false }} onPointerCancel={() => { dragging.current = false }}>{FLOOR_OPTIONS.map((floor) => { const selected = draft.includes(floor); return <button key={floor} type="button" onPointerDown={() => { dragging.current = true; toggle(floor) }} onPointerEnter={() => { if (dragging.current && !draft.includes(floor)) toggle(floor) }} className={`min-h-11 rounded-lg border px-1 text-sm font-semibold transition-colors ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-muted"}`}><span className="flex items-center justify-center gap-1">{selected && <Check className="size-3.5" />}{floor}</span></button> })}</div><DialogFooter><Button type="button" onClick={() => { onChange(draft.join(", ")); setOpen(false) }}>선택 완료 ({draft.length})</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={open} onOpenChange={setOpen}><DialogContent className="flex max-h-[90dvh] max-w-lg flex-col overflow-hidden p-4 sm:p-6"><DialogHeader><DialogTitle>{label}</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">원하는 층을 하나씩 눌러 선택하거나 해제하세요.</p><div className="grid max-h-[55vh] grid-cols-3 gap-2 overflow-y-auto overscroll-contain px-1 pb-2 select-none touch-pan-y sm:grid-cols-4">{FLOOR_OPTIONS.map((floor) => { const selected = draft.includes(floor); return <button key={floor} type="button" onClick={() => toggle(floor)} className={`min-h-11 rounded-lg border px-1 text-sm font-semibold transition-colors ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-muted"}`}><span className="flex items-center justify-center gap-1">{selected && <Check className="size-3.5" />}{floor}</span></button> })}</div><DialogFooter><Button type="button" onClick={() => { onChange(draft.join(", ")); setOpen(false) }}>선택 완료 ({draft.length})</Button></DialogFooter></DialogContent></Dialog>
   </>
 }
 

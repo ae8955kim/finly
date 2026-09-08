@@ -31,7 +31,22 @@ export function VisitorForm({ onRegistered }: { onRegistered: (visitorId: string
 
     setSubmitting(true)
     try {
-      // 버그 1 수정: 등록 시 곧바로 'onsite(재실)'가 아니라 'pending(승인 대기)' 상태로 들어가도록 변경
+      const { data: existing, error: existingError } = await supabase
+        .from("visitors")
+        .select("id, status")
+        .eq("phone", form.phone)
+        .in("status", ["pending", "onsite"])
+        .order("registered_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (existingError) throw existingError
+      if (existing?.id) {
+        toast.info("이미 진행 중인 방문 신청이 있습니다. 기존 상태를 표시합니다.")
+        onRegistered(existing.id)
+        return
+      }
+
       const { data, error } = await supabase
         .from("visitors")
         .insert([
