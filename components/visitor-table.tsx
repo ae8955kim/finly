@@ -22,7 +22,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { ChatPanel } from "@/components/chat-panel"
-import { FloorBadges } from "@/components/floor-picker"
+import { FloorBadges, sortFloors } from "@/components/floor-picker"
 import type { Visitor, ChatMessage } from "@/lib/types"
 import { createClient } from "@/lib/supabase/client"
 
@@ -151,7 +151,7 @@ function VisitorRow({
     <TableRow>
       <TableCell className="font-medium">{visitor.name ?? "-"}</TableCell>
       <TableCell className="text-muted-foreground">{visitor.company ?? "-"}</TableCell>
-      <TableCell><Button type="button" variant="ghost" size="sm" className="h-auto justify-start px-1 text-left" onClick={() => onOpenFloors(visitor)} title="작업층 확인"><FloorBadges value={visitor.floor ?? ""} /></Button></TableCell>
+      <TableCell><Button type="button" variant="outline" size="sm" className="whitespace-nowrap" onClick={() => onOpenFloors(visitor)} title="작업층 확인">작업층 확인</Button></TableCell>
       <TableCell className="hidden font-mono text-xs text-muted-foreground lg:table-cell">
         {visitor.phone ?? "-"}
       </TableCell>
@@ -361,7 +361,7 @@ export function VisitorTable({
 
   return (
     <>
-      <div className="overflow-hidden rounded-xl border border-border">
+      <div className="w-full max-w-full overflow-x-auto rounded-xl border border-border">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
