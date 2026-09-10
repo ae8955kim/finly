@@ -259,17 +259,17 @@ export function VisitorStatusView({
           
           <div className="pt-2 flex justify-center">
             {status === "pending" && (
-              <Badge variant="outline" className="gap-1 border-amber-500/40 bg-amber-500/20 px-3 py-1 text-xs text-amber-400">
+              <Badge variant="outline" className="gap-1 border-amber-700 bg-amber-500 px-3 py-1 text-xs font-bold text-white shadow-sm">
                 <Clock className="size-3.5" /> 승인 대기 중
               </Badge>
             )}
             {status === "onsite" && (
-              <Badge variant="outline" className="gap-1 border-emerald-500/40 bg-emerald-500/20 px-3 py-1 text-xs text-emerald-400">
+              <Badge variant="outline" className="gap-1 border-emerald-700 bg-emerald-600 px-3 py-1 text-xs font-bold text-white shadow-sm">
                 <CheckCircle2 className="size-3.5" /> 재실 중 (승인 완료)
               </Badge>
             )}
             {status === "exited" && (
-              <Badge variant="outline" className="gap-1 border-slate-500/40 bg-slate-500/20 px-3 py-1 text-xs text-slate-400">
+              <Badge variant="outline" className="gap-1 border-slate-700 bg-slate-600 px-3 py-1 text-xs font-bold text-white shadow-sm">
                 퇴실 완료
               </Badge>
             )}
