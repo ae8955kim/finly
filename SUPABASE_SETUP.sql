@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS public.visitors (
   name TEXT NOT NULL,
   floor TEXT NOT NULL,
   company TEXT NOT NULL,
+  contact_name TEXT,
+  contact_company TEXT,
   birth TEXT NOT NULL,
   phone TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('pending', 'onsite', 'exited', 'deleted')) DEFAULT 'pending',
@@ -23,6 +25,10 @@ CREATE TABLE IF NOT EXISTS public.visitors (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
+
+-- 기존 visitors 테이블에도 담당자 필드를 안전하게 추가합니다.
+ALTER TABLE public.visitors ADD COLUMN IF NOT EXISTS contact_name TEXT;
+ALTER TABLE public.visitors ADD COLUMN IF NOT EXISTS contact_company TEXT;
 
 -- 테이블 설명 추가
 COMMENT ON TABLE public.visitors IS '방문자 출입 관리 테이블';

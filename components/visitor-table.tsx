@@ -23,7 +23,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { ChatPanel } from "@/components/chat-panel"
-import { FloorBadges, sortFloors } from "@/components/floor-picker"
+import { FloorBadges, FloorPicker, sortFloors } from "@/components/floor-picker"
 import type { Visitor, ChatMessage } from "@/lib/types"
 import { createClient } from "@/lib/supabase/client"
 
@@ -430,7 +430,7 @@ export function VisitorTable({
         </Table>
       </div>
 
-      <Dialog open={editVisitor !== null} onOpenChange={(open) => !open && setEditVisitor(null)}><DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>방문자 정보 수정</DialogTitle></DialogHeader><div className="grid gap-4 py-2"><Input aria-label="이름" value={editForm.name} onChange={(e) => setEditForm((form) => ({ ...form, name: e.target.value }))} placeholder="이름" /><Input aria-label="소속" value={editForm.company} onChange={(e) => setEditForm((form) => ({ ...form, company: e.target.value }))} placeholder="소속" /><Input aria-label="작업층" value={editForm.floor} onChange={(e) => setEditForm((form) => ({ ...form, floor: e.target.value }))} placeholder="작업층" /><Input aria-label="전화번호" value={editForm.phone} onChange={(e) => setEditForm((form) => ({ ...form, phone: e.target.value }))} placeholder="전화번호" /><Input aria-label="담당자 성함" value={editForm.contact_name} onChange={(e) => setEditForm((form) => ({ ...form, contact_name: e.target.value }))} placeholder="담당자 성함" /><Input aria-label="담당자 소속" value={editForm.contact_company} onChange={(e) => setEditForm((form) => ({ ...form, contact_company: e.target.value }))} placeholder="담당자 소속" /></div><DialogFooter><Button variant="outline" onClick={() => setEditVisitor(null)}>취소</Button><Button onClick={handleSaveEdit} disabled={savingEdit}>{savingEdit ? "저장 중..." : "저장"}</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={editVisitor !== null} onOpenChange={(open) => !open && setEditVisitor(null)}><DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>방문자 정보 수정</DialogTitle></DialogHeader><div className="grid gap-4 py-2"><Input aria-label="이름" value={editForm.name} onChange={(e) => setEditForm((form) => ({ ...form, name: e.target.value }))} placeholder="이름" /><Input aria-label="소속" value={editForm.company} onChange={(e) => setEditForm((form) => ({ ...form, company: e.target.value }))} placeholder="소속" /><FloorPicker value={editForm.floor} onChange={(floor) => setEditForm((form) => ({ ...form, floor }))} label="작업층 선택" /><Input aria-label="전화번호" value={editForm.phone} onChange={(e) => setEditForm((form) => ({ ...form, phone: e.target.value }))} placeholder="전화번호" /><Input aria-label="담당자 성함" value={editForm.contact_name} onChange={(e) => setEditForm((form) => ({ ...form, contact_name: e.target.value }))} placeholder="담당자 성함" /><Input aria-label="담당자 소속" value={editForm.contact_company} onChange={(e) => setEditForm((form) => ({ ...form, contact_company: e.target.value }))} placeholder="담당자 소속" /></div><DialogFooter><Button variant="outline" onClick={() => setEditVisitor(null)}>취소</Button><Button onClick={handleSaveEdit} disabled={savingEdit}>{savingEdit ? "저장 중..." : "저장"}</Button></DialogFooter></DialogContent></Dialog>
 
       <Dialog open={floorVisitor !== null} onOpenChange={(open) => !open && setFloorVisitor(null)}><DialogContent><DialogHeader><DialogTitle>{floorVisitor ? `${floorVisitor.name} · 작업층` : "작업층"}</DialogTitle></DialogHeader>{floorVisitor && <FloorBadges value={floorVisitor.floor ?? ""} />}</DialogContent></Dialog>
 

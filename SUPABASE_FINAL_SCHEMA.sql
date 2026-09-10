@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS public.visitors (
   name TEXT NOT NULL,
   floor TEXT NOT NULL,
   company TEXT NOT NULL,
+  contact_name TEXT,
+  contact_company TEXT,
   birth TEXT NOT NULL,
   phone TEXT NOT NULL,
   
@@ -30,6 +32,10 @@ CREATE TABLE IF NOT EXISTS public.visitors (
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
+
+-- 기존 visitors 테이블에도 담당자 필드를 안전하게 추가합니다.
+ALTER TABLE public.visitors ADD COLUMN IF NOT EXISTS contact_name TEXT;
+ALTER TABLE public.visitors ADD COLUMN IF NOT EXISTS contact_company TEXT;
 
 -- ============================================================================
 -- 2. CHAT_MESSAGES 테이블 - 양방향 채팅
