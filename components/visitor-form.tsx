@@ -90,10 +90,8 @@ export function VisitorForm({ onRegistered }: { onRegistered: (visitorId: string
       <form onSubmit={handleSubmit} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
         <div className="mb-6 flex flex-col gap-4">
           <Field id="name" label="이름" value={form.name} onChange={update("name")} placeholder="홍길동" autoComplete="name" />
-          <div className="flex flex-col gap-2"><Label htmlFor="floor">작업층</Label><FloorPicker value={form.floor} onChange={(floor) => setForm((current) => ({ ...current, floor }))} label="작업층 선택" /></div>
           <Field id="company" label="소속" value={form.company} onChange={update("company")} placeholder="예) OO건설" />
-          <Field id="contact_name" label="담당자 성함" value={form.contact_name} onChange={update("contact_name")} placeholder="예) 김담당" />
-          <Field id="contact_company" label="담당자 소속" value={form.contact_company} onChange={update("contact_company")} placeholder="예) OO건설 현장사무실" />
+          <div className="flex flex-col gap-2"><Label htmlFor="floor">작업층</Label><FloorPicker value={form.floor} onChange={(floor) => setForm((current) => ({ ...current, floor }))} label="작업층 선택" /></div>
           <Field
             id="phone"
             label="전화번호"
@@ -104,6 +102,8 @@ export function VisitorForm({ onRegistered }: { onRegistered: (visitorId: string
             inputMode="tel"
             autoComplete="tel"
           />
+          <Field id="contact_name" label="담당자 성함" value={form.contact_name} onChange={update("contact_name")} placeholder="예) 김담당" />
+          <Field id="contact_company" label="담당자 소속" value={form.contact_company} onChange={update("contact_company")} placeholder="예)오피스그룹" />
         </div>
         <Button type="submit" size="lg" className="w-full" disabled={submitting || !privacyAgreed}>
           <HardHat className="size-4" />
