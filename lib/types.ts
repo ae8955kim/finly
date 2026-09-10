@@ -15,6 +15,10 @@ export interface Visitor {
   name: string
   floor: string
   company: string
+  contact_name?: string | null
+  contact_company?: string | null
+  contactName?: string | null
+  contactCompany?: string | null
   birth?: string
   phone?: string
   status: "pending" | "onsite" | "exited" | "deleted"

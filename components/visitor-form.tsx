@@ -11,7 +11,7 @@ import { PrivacyConsentModal } from "@/components/privacy-consent-modal"
 import { createClient } from "@/lib/supabase/client"
 import { FloorPicker } from "@/components/floor-picker"
 
-const EMPTY = { name: "", floor: "", company: "", phone: "" }
+const EMPTY = { name: "", floor: "", company: "", phone: "", contact_name: "", contact_company: "" }
 
 export function VisitorForm({ onRegistered }: { onRegistered: (visitorId: string) => void }) {
   const [form, setForm] = useState(EMPTY)
@@ -55,6 +55,8 @@ export function VisitorForm({ onRegistered }: { onRegistered: (visitorId: string
             floor: form.floor,
             company: form.company,
             phone: form.phone,
+            contact_name: form.contact_name,
+            contact_company: form.contact_company,
             status: "pending", // 승인 대기 상태로 설정
             registered_at: new Date().toISOString(),
             // entered_at은 관리자가 승인 후 입실 처리할 때 들어가도록 제외합니다.
@@ -90,6 +92,8 @@ export function VisitorForm({ onRegistered }: { onRegistered: (visitorId: string
           <Field id="name" label="이름" value={form.name} onChange={update("name")} placeholder="홍길동" autoComplete="name" />
           <div className="flex flex-col gap-2"><Label htmlFor="floor">작업층</Label><FloorPicker value={form.floor} onChange={(floor) => setForm((current) => ({ ...current, floor }))} label="작업층 선택" /></div>
           <Field id="company" label="소속" value={form.company} onChange={update("company")} placeholder="예) OO건설" />
+          <Field id="contact_name" label="담당자 성함" value={form.contact_name} onChange={update("contact_name")} placeholder="예) 김담당" />
+          <Field id="contact_company" label="담당자 소속" value={form.contact_company} onChange={update("contact_company")} placeholder="예) OO건설 현장사무실" />
           <Field
             id="phone"
             label="전화번호"
