@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { toast } from "sonner"
 import { FileText, MessageCircle, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -56,6 +57,7 @@ function VisitorRow({
   onOpenChat,
   onOpenMemo,
   onOpenFloors,
+  onOpenEdit,
   isChatOpen,
 }: {
   visitor: Visitor & { displayEnteredAt?: string; displayExitedAt?: string }
@@ -64,6 +66,7 @@ function VisitorRow({
   onOpenChat: (visitor: Visitor) => void
   onOpenMemo: (visitor: Visitor) => void
   onOpenFloors: (visitor: Visitor) => void
+  onOpenEdit: (visitor: Visitor) => void
   isChatOpen: boolean
 }) {
   const meta = STATUS_META[visitor.status] || STATUS_META.pending
@@ -210,6 +213,7 @@ function VisitorRow({
 
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-2">
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => onOpenEdit(visitor)} aria-label={`${visitor.name ?? "방문자"} 정보 수정`}>수정하기</Button>
           {visitor.status === "pending" && (
             <>
               <Button size="sm" disabled={busy} onClick={() => onAct(visitor.id, "approve")}>
@@ -274,10 +278,41 @@ export function VisitorTable({
   const [pendingId, setPendingId] = useState<string | null>(null)
   const [chatWith, setChatWith] = useState<Visitor | null>(null)
   const [floorVisitor, setFloorVisitor] = useState<Visitor | null>(null)
+  const [editVisitor, setEditVisitor] = useState<Visitor | null>(null)
+  const [editForm, setEditForm] = useState({ name: "", company: "", floor: "", phone: "", contact_name: "", contact_company: "" })
+  const [savingEdit, setSavingEdit] = useState(false)
   
   const [memoVisitor, setMemoVisitor] = useState<Visitor | null>(null)
   const [memoText, setMemoText] = useState("")
   const [savingMemo, setSavingMemo] = useState(false)
+
+  const handleOpenEdit = (visitor: Visitor) => {
+    setEditVisitor(visitor)
+    setEditForm({
+      name: visitor.name || "",
+      company: visitor.company || "",
+      floor: visitor.floor || "",
+      phone: visitor.phone || "",
+      contact_name: visitor.contact_name || visitor.contactName || "",
+      contact_company: visitor.contact_company || visitor.contactCompany || "",
+    })
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editVisitor) return
+    setSavingEdit(true)
+    try {
+      const { error } = await supabase.from("visitors").update(editForm).eq("id", editVisitor.id)
+      if (error) throw error
+      toast.success("방문자 정보가 수정되었습니다.")
+      setEditVisitor(null)
+      onMutate()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "수정에 실패했습니다.")
+    } finally {
+      setSavingEdit(false)
+    }
+  }
 
   const handleOpenMemo = (visitor: Visitor) => {
     setMemoVisitor(visitor)
@@ -387,12 +422,15 @@ export function VisitorTable({
                 onOpenChat={(visitor) => setChatWith(visitor)}
                 onOpenMemo={handleOpenMemo}
                 onOpenFloors={(visitor) => setFloorVisitor(visitor)}
+                onOpenEdit={handleOpenEdit}
                 isChatOpen={chatWith?.id === v.id}
               />
             ))}
           </TableBody>
         </Table>
       </div>
+
+      <Dialog open={editVisitor !== null} onOpenChange={(open) => !open && setEditVisitor(null)}><DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>방문자 정보 수정</DialogTitle></DialogHeader><div className="grid gap-4 py-2"><Input aria-label="이름" value={editForm.name} onChange={(e) => setEditForm((form) => ({ ...form, name: e.target.value }))} placeholder="이름" /><Input aria-label="소속" value={editForm.company} onChange={(e) => setEditForm((form) => ({ ...form, company: e.target.value }))} placeholder="소속" /><Input aria-label="작업층" value={editForm.floor} onChange={(e) => setEditForm((form) => ({ ...form, floor: e.target.value }))} placeholder="작업층" /><Input aria-label="전화번호" value={editForm.phone} onChange={(e) => setEditForm((form) => ({ ...form, phone: e.target.value }))} placeholder="전화번호" /><Input aria-label="담당자 성함" value={editForm.contact_name} onChange={(e) => setEditForm((form) => ({ ...form, contact_name: e.target.value }))} placeholder="담당자 성함" /><Input aria-label="담당자 소속" value={editForm.contact_company} onChange={(e) => setEditForm((form) => ({ ...form, contact_company: e.target.value }))} placeholder="담당자 소속" /></div><DialogFooter><Button variant="outline" onClick={() => setEditVisitor(null)}>취소</Button><Button onClick={handleSaveEdit} disabled={savingEdit}>{savingEdit ? "저장 중..." : "저장"}</Button></DialogFooter></DialogContent></Dialog>
 
       <Dialog open={floorVisitor !== null} onOpenChange={(open) => !open && setFloorVisitor(null)}><DialogContent><DialogHeader><DialogTitle>{floorVisitor ? `${floorVisitor.name} · 작업층` : "작업층"}</DialogTitle></DialogHeader>{floorVisitor && <FloorBadges value={floorVisitor.floor ?? ""} />}</DialogContent></Dialog>
 

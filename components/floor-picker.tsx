@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 export const FLOOR_OPTIONS = [
   "P2층",
   "P1층",
-  ...Array.from({ length: 42 }, (_, index) => `${42 - index}층`),
+  ...Array.from({ length: 42 }, (_, index) => `${42 - index}층`).filter((floor) => floor !== "4층" && floor !== "13층"),
   ...Array.from({ length: 8 }, (_, index) => `지하 ${index + 1}층`),
   "외부",
 ]
