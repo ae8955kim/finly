@@ -240,12 +240,12 @@ export function VisitorStatusView({
       </div>
 
       {/* 상태 메인 카드 */}
-      <Card className={`border-2 shadow-lg transition-colors ${
+      <Card className={`border-4 shadow-2xl transition-colors ${
         status === "pending"
-          ? "border-amber-500/30 bg-amber-500/10"
+          ? "border-yellow-500 bg-yellow-50 text-slate-950"
           : status === "onsite"
-          ? "border-emerald-500/30 bg-emerald-500/10"
-          : "border-slate-500/30 bg-slate-500/10"
+          ? "border-lime-500 bg-lime-50 text-slate-950 shadow-lime-500/40"
+          : "border-slate-500 bg-slate-100 text-slate-950"
       }`}>
         <CardHeader className="pb-4 text-center">
           <div className={`mx-auto mb-2 flex size-12 items-center justify-center rounded-full ${
@@ -281,17 +281,17 @@ export function VisitorStatusView({
 
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-2 text-center text-xs">
-            <div className="rounded-lg bg-background/50 p-2.5 border border-border/40">
+            <div className="rounded-lg border-2 border-slate-200 bg-white p-2.5 shadow-sm">
               <span className="block text-muted-foreground mb-1">입실 시간</span>
               <span className="font-mono text-sm font-semibold">{formatTime(enteredAt)}</span>
             </div>
-            <div className="rounded-lg bg-background/50 p-2.5 border border-border/40">
+            <div className="rounded-lg border-2 border-slate-200 bg-white p-2.5 shadow-sm">
               <span className="block text-muted-foreground mb-1">퇴실 시간</span>
               <span className="font-mono text-sm font-semibold">{formatTime(exitedAt)}</span>
             </div>
           </div>
 
-          <div className="space-y-2 rounded-lg bg-background/60 p-4 text-sm border border-border/40">
+          <div className="space-y-2 rounded-lg border-2 border-slate-200 bg-white p-4 text-sm shadow-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">소속</span>
               <span className="font-medium">{company}</span>
