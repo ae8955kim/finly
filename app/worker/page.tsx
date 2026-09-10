@@ -4,7 +4,7 @@ import { WorkerApp } from "@/components/worker-app"
 export default function WorkerDashboard() {
   return (
     <main className="min-h-dvh w-full bg-white px-4 py-8 text-slate-950">
-      <header className="mx-auto mb-8 flex max-w-md flex-col items-center gap-3 text-center"> className="mb-8 flex flex-col items-center gap-3 text-center">
+      <header className="mx-auto mb-8 flex max-w-md flex-col items-center gap-3 text-center">
         <div className="flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
           <Building2 className="size-7" />
         </div>
