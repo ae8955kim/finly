@@ -62,7 +62,11 @@ export function VisitorStatusView({
         .single()
 
       if (error || !data) {
-        throw new Error("정보를 불러올 수 없습니다.")
+        // 네트워크 오류나 일시적인 Supabase 장애에서는 기존 화면과 세션을 유지합니다.
+        if (error?.code === "PGRST116" || !data) {
+          return
+        }
+        return
       }
 
       if (data.status === "deleted") {
@@ -74,8 +78,7 @@ export function VisitorStatusView({
       setVisitor(data)
     } catch (err) {
       console.error("[Visitor Status Fetch Error]:", err)
-      toast.info("등록된 신청 정보가 없습니다.")
-      onReset()
+      // 재시도 가능한 오류로 간주하고 localStorage의 visitorId와 현재 화면을 유지합니다.
     } finally {
       setIsLoading(false)
     }
@@ -259,17 +262,17 @@ export function VisitorStatusView({
           
           <div className="pt-2 flex justify-center">
             {status === "pending" && (
-              <Badge variant="outline" className="gap-1 border-amber-700 bg-amber-500 px-3 py-1 text-xs font-bold text-white shadow-sm">
+              <Badge variant="outline" className="gap-1 border-yellow-900 bg-yellow-400 px-3 py-1 text-xs font-black text-black shadow-md">
                 <Clock className="size-3.5" /> 승인 대기 중
               </Badge>
             )}
             {status === "onsite" && (
-              <Badge variant="outline" className="gap-1 border-emerald-700 bg-emerald-600 px-3 py-1 text-xs font-bold text-white shadow-sm">
+              <Badge variant="outline" className="gap-1 border-green-900 bg-green-500 px-3 py-1 text-xs font-black text-black shadow-md">
                 <CheckCircle2 className="size-3.5" /> 재실 중 (승인 완료)
               </Badge>
             )}
             {status === "exited" && (
-              <Badge variant="outline" className="gap-1 border-slate-700 bg-slate-600 px-3 py-1 text-xs font-bold text-white shadow-sm">
+              <Badge variant="outline" className="gap-1 border-slate-950 bg-slate-500 px-3 py-1 text-xs font-black text-white shadow-md">
                 퇴실 완료
               </Badge>
             )}

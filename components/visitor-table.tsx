@@ -34,15 +34,15 @@ type VisitorStatus = Visitor["status"]
 const STATUS_META: Record<VisitorStatus, { label: string; className: string }> = {
   pending: {
     label: "승인 대기",
-    className: "border-amber-700 bg-amber-500 px-2.5 py-1 font-bold text-white shadow-sm",
+    className: "border-yellow-900 bg-yellow-400 px-2.5 py-1 font-black text-black shadow-md",
   },
   onsite: {
     label: "재실 중",
-    className: "border-emerald-700 bg-emerald-600 px-2.5 py-1 font-bold text-white shadow-sm",
+    className: "border-green-900 bg-green-500 px-2.5 py-1 font-black text-black shadow-md",
   },
   exited: {
     label: "퇴실",
-    className: "border-slate-700 bg-slate-600 px-2.5 py-1 font-bold text-white shadow-sm",
+    className: "border-slate-950 bg-slate-500 px-2.5 py-1 font-black text-white shadow-md",
   },
   deleted: {
     label: "삭제됨",
@@ -414,7 +414,7 @@ export function VisitorTable({
               <TableHead className="text-center">상태</TableHead>
               <TableHead className="text-center">메모</TableHead>
               <TableHead className="text-center">문의</TableHead>
-              <TableHead className="text-right">관���</TableHead>
+              <TableHead className="text-right">관리</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
