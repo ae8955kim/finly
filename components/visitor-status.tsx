@@ -206,7 +206,7 @@ export function VisitorStatusView({
   return (
     <div className="mx-auto w-full max-w-md min-w-0 space-y-4 overflow-x-hidden">
       <AlertDialog open={Boolean(announcement)} onOpenChange={() => undefined}>
-        <AlertDialogContent className="border-2 border-amber-400 bg-slate-950 text-white shadow-2xl shadow-black/60 sm:max-w-md">
+        <AlertDialogContent className="border-2 border-amber-400 bg-popover text-popover-foreground shadow-2xl shadow-black/60 sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-bold text-amber-300">관리자 공지</AlertDialogTitle>
             <AlertDialogDescription className="whitespace-pre-wrap text-base font-medium leading-relaxed text-white">
@@ -242,10 +242,10 @@ export function VisitorStatusView({
       {/* 상태 메인 카드 */}
       <Card className={`border-4 shadow-2xl transition-colors ${
         status === "pending"
-          ? "border-yellow-500 bg-yellow-50 text-slate-950"
+          ? "border-yellow-400 bg-card text-foreground shadow-yellow-400/30"
           : status === "onsite"
-          ? "border-lime-500 bg-lime-50 text-slate-950 shadow-lime-500/40"
-          : "border-slate-500 bg-slate-100 text-slate-950"
+          ? "border-lime-400 bg-card text-foreground shadow-lime-400/40"
+          : "border-slate-400 bg-card text-foreground"
       }`}>
         <CardHeader className="pb-4 text-center">
           <div className={`mx-auto mb-2 flex size-12 items-center justify-center rounded-full ${
@@ -281,17 +281,17 @@ export function VisitorStatusView({
 
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-2 text-center text-xs">
-            <div className="rounded-lg border-2 border-slate-200 bg-white p-2.5 shadow-sm">
+            <div className="rounded-lg border-2 border-border bg-background p-2.5 shadow-sm">
               <span className="block text-muted-foreground mb-1">입실 시간</span>
               <span className="font-mono text-sm font-semibold">{formatTime(enteredAt)}</span>
             </div>
-            <div className="rounded-lg border-2 border-slate-200 bg-white p-2.5 shadow-sm">
+            <div className="rounded-lg border-2 border-border bg-background p-2.5 shadow-sm">
               <span className="block text-muted-foreground mb-1">퇴실 시간</span>
               <span className="font-mono text-sm font-semibold">{formatTime(exitedAt)}</span>
             </div>
           </div>
 
-          <div className="space-y-2 rounded-lg border-2 border-slate-200 bg-white p-4 text-sm shadow-sm">
+          <div className="space-y-2 rounded-lg border-2 border-border bg-background p-4 text-sm shadow-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">소속</span>
               <span className="font-medium">{company}</span>
@@ -307,7 +307,7 @@ export function VisitorStatusView({
           <div className="grid grid-cols-2 gap-3 pt-2">
             <Button
               variant="outline"
-              className="w-full gap-2 bg-background/80"
+              className="w-full gap-2 bg-background"
               onClick={() => setIsChatOpen(true)}
             >
               <MessageCircle className="size-4" />
