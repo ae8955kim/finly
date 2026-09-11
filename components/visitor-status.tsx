@@ -242,10 +242,10 @@ export function VisitorStatusView({
       {/* 상태 메인 카드 */}
       <Card className={`border-4 shadow-2xl transition-colors ${
         status === "pending"
-          ? "border-yellow-400 bg-card text-foreground shadow-yellow-400/30"
+          ? "border-yellow-400 bg-yellow-300 text-slate-950 shadow-2xl shadow-yellow-400/50"
           : status === "onsite"
-          ? "border-lime-400 bg-card text-foreground shadow-lime-400/40"
-          : "border-slate-400 bg-card text-foreground"
+          ? "border-lime-400 bg-lime-300 text-slate-950 shadow-2xl shadow-lime-400/60"
+          : "border-slate-400 bg-slate-200 text-slate-950 shadow-2xl shadow-slate-500/30"
       }`}>
         <CardHeader className="pb-4 text-center">
           <div className={`mx-auto mb-2 flex size-12 items-center justify-center rounded-full ${
@@ -258,7 +258,7 @@ export function VisitorStatusView({
             <Building2 className="size-6" />
           </div>
           <CardTitle className="text-xl font-bold">{name} 님</CardTitle>
-          <CardDescription className="text-foreground/70">{company}</CardDescription>
+          <CardDescription className="font-semibold text-slate-800">{company}</CardDescription>
           
           <div className="pt-2 flex justify-center">
             {status === "pending" && (
@@ -281,24 +281,24 @@ export function VisitorStatusView({
 
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-2 text-center text-xs">
-            <div className="rounded-lg border-2 border-border bg-background p-2.5 shadow-sm">
-              <span className="block text-muted-foreground mb-1">입실 시간</span>
+            <div className="rounded-lg border-2 border-slate-700/30 bg-white/75 p-2.5 text-slate-950 shadow-sm backdrop-blur-sm">
+              <span className="mb-1 block font-bold text-slate-700">입실 시간</span>
               <span className="font-mono text-sm font-semibold">{formatTime(enteredAt)}</span>
             </div>
-            <div className="rounded-lg border-2 border-border bg-background p-2.5 shadow-sm">
-              <span className="block text-muted-foreground mb-1">퇴실 시간</span>
+            <div className="rounded-lg border-2 border-slate-700/30 bg-white/75 p-2.5 text-slate-950 shadow-sm backdrop-blur-sm">
+              <span className="mb-1 block font-bold text-slate-700">퇴실 시간</span>
               <span className="font-mono text-sm font-semibold">{formatTime(exitedAt)}</span>
             </div>
           </div>
 
-          <div className="space-y-2 rounded-lg border-2 border-border bg-background p-4 text-sm shadow-sm">
+          <div className="space-y-2 rounded-lg border-2 border-slate-700/30 bg-white/75 p-4 text-sm text-slate-950 shadow-sm backdrop-blur-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">소속</span>
+              <span className="font-bold text-slate-700">소속</span>
               <span className="font-medium">{company}</span>
             </div>
-            <div className="space-y-2"><span className="block text-muted-foreground">작업층 (고정)</span><FloorBadges value={floor} /></div>
+            <div className="space-y-2"><span className="block font-bold text-slate-700">작업층 (고정)</span><FloorBadges value={floor} /></div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">연락처</span>
+              <span className="font-bold text-slate-700">연락처</span>
               <span className="font-mono">{phone}</span>
             </div>
           </div>
@@ -307,7 +307,7 @@ export function VisitorStatusView({
           <div className="grid grid-cols-2 gap-3 pt-2">
             <Button
               variant="outline"
-              className="w-full gap-2 bg-background"
+              className="w-full gap-2 border-2 border-slate-700 bg-white font-bold text-slate-950 hover:bg-slate-100"
               onClick={() => setIsChatOpen(true)}
             >
               <MessageCircle className="size-4" />
