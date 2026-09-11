@@ -87,7 +87,7 @@ export function VisitorForm({ onRegistered }: { onRegistered: (visitorId: string
           setPrivacyAgreed(true)
         }}
       />
-      <form onSubmit={handleSubmit} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <form onSubmit={handleSubmit} className="rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-sm">
         <div className="mb-6 flex flex-col gap-4">
           <Field id="name" label="이름" value={form.name} onChange={update("name")} placeholder="홍길동" autoComplete="name" />
           <Field id="company" label="소속" value={form.company} onChange={update("company")} placeholder="예) OO건설" />
