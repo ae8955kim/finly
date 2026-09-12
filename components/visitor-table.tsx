@@ -306,13 +306,18 @@ export function VisitorTable({
     if (!editVisitor) return
     setSavingEdit(true)
     try {
-      const statusChangedToActive = editForm.status === "pending" || editForm.status === "onsite"
-      const wasExited = editVisitor.status === "exited" || editVisitor.status === "deleted"
+      const now = new Date().toISOString()
       const payload = {
-        ...editForm,
-        exited_at: statusChangedToActive && wasExited ? null : editVisitor.exited_at,
-        deleted_at: editForm.status === "deleted" ? editVisitor.deleted_at || new Date().toISOString() : null,
-        entered_at: editForm.status === "onsite" ? editVisitor.entered_at || new Date().toISOString() : editForm.status === "pending" ? null : editVisitor.entered_at,
+        name: editForm.name,
+        company: editForm.company,
+        floor: editForm.floor,
+        phone: editForm.phone.trim(),
+        contact_name: editForm.contact_name,
+        contact_company: editForm.contact_company,
+        status: editForm.status,
+        deleted_at: editForm.status === "deleted" ? editVisitor.deleted_at || now : null,
+        exited_at: editForm.status === "exited" || editForm.status === "deleted" ? editVisitor.exited_at || now : null,
+        entered_at: editForm.status === "onsite" ? editVisitor.entered_at || now : null,
       }
       const { error } = await supabase.from("visitors").update(payload).eq("id", editVisitor.id)
       if (error) throw error

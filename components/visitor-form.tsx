@@ -42,9 +42,7 @@ export function VisitorForm({ onRegistered }: { onRegistered: (visitorId: string
 
       if (existingError) throw existingError
       if (existing?.id) {
-        toast.info("이미 진행 중인 방문 신청이 있습니다. 기존 상태를 표시합니다.")
-        sessionStorage.setItem("visitorPhone", form.phone.trim())
-        onRegistered(existing.id)
+        window.alert("기등록된 브라우저가 있습니다. 이전 이용하신 브라우저를 통해 접속 부탁드립니다. 계속된 오류시 02-2255-4111 번호를 통한 문의부탁드립니다.")
         return
       }
 
@@ -75,7 +73,6 @@ export function VisitorForm({ onRegistered }: { onRegistered: (visitorId: string
       if (!data) throw new Error("등록에 실패했습니다.")
 
       toast.success("방문 신청이 완료되었습니다. 관리자 승인을 기다려주세요.")
-      sessionStorage.setItem("visitorPhone", form.phone.trim())
       onRegistered(data.id)
     } catch (err: any) {
       console.error("[Visitor Register Error]:", err)
