@@ -282,7 +282,7 @@ export function VisitorTable({
   const [chatWith, setChatWith] = useState<Visitor | null>(null)
   const [floorVisitor, setFloorVisitor] = useState<Visitor | null>(null)
   const [editVisitor, setEditVisitor] = useState<Visitor | null>(null)
-  const [editForm, setEditForm] = useState({ name: "", company: "", floor: "", phone: "", contact_name: "", contact_company: "" })
+  const [editForm, setEditForm] = useState({ name: "", company: "", floor: "", phone: "", contact_name: "", contact_company: "", status: "pending" as Visitor["status"] })
   const [savingEdit, setSavingEdit] = useState(false)
   
   const [memoVisitor, setMemoVisitor] = useState<Visitor | null>(null)
@@ -298,6 +298,7 @@ export function VisitorTable({
       phone: visitor.phone || "",
       contact_name: visitor.contact_name || visitor.contactName || "",
       contact_company: visitor.contact_company || visitor.contactCompany || "",
+      status: visitor.status,
     })
   }
 
@@ -305,7 +306,15 @@ export function VisitorTable({
     if (!editVisitor) return
     setSavingEdit(true)
     try {
-      const { error } = await supabase.from("visitors").update(editForm).eq("id", editVisitor.id)
+      const statusChangedToActive = editForm.status === "pending" || editForm.status === "onsite"
+      const wasExited = editVisitor.status === "exited" || editVisitor.status === "deleted"
+      const payload = {
+        ...editForm,
+        exited_at: statusChangedToActive && wasExited ? null : editVisitor.exited_at,
+        deleted_at: editForm.status === "deleted" ? editVisitor.deleted_at || new Date().toISOString() : null,
+        entered_at: editForm.status === "onsite" ? editVisitor.entered_at || new Date().toISOString() : editForm.status === "pending" ? null : editVisitor.entered_at,
+      }
+      const { error } = await supabase.from("visitors").update(payload).eq("id", editVisitor.id)
       if (error) throw error
       toast.success("방문자 정보가 수정되었습니다.")
       setEditVisitor(null)
@@ -358,9 +367,10 @@ export function VisitorTable({
       } else if (action === "exit") {
         updatePayload = { status: "exited", exited_at: now }
       } else if (action === "delete") {
-        updatePayload = { status: "deleted", deleted_at: now }
+        updatePayload = { status: "deleted", deleted_at: now, exited_at: now }
       } else if (action === "restore") {
-        updatePayload = { status: "pending", deleted_at: null }
+        // 복구해도 삭제 당시의 퇴실 상태와 시간은 유지합니다.
+        updatePayload = { deleted_at: null }
       }
 
       const { error } = await supabase
@@ -435,7 +445,7 @@ export function VisitorTable({
         </Table>
       </div>
 
-      <Dialog open={editVisitor !== null} onOpenChange={(open) => !open && setEditVisitor(null)}><DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>방문자 정보 수정</DialogTitle></DialogHeader><div className="grid gap-4 py-2"><Input aria-label="이름" value={editForm.name} onChange={(e) => setEditForm((form) => ({ ...form, name: e.target.value }))} placeholder="이름" /><Input aria-label="소속" value={editForm.company} onChange={(e) => setEditForm((form) => ({ ...form, company: e.target.value }))} placeholder="소속" /><FloorPicker value={editForm.floor} onChange={(floor) => setEditForm((form) => ({ ...form, floor }))} label="���업층 선택" /><Input aria-label="전화번호" value={editForm.phone} onChange={(e) => setEditForm((form) => ({ ...form, phone: e.target.value }))} placeholder="전화번호" /><Input aria-label="담당자 성함" value={editForm.contact_name} onChange={(e) => setEditForm((form) => ({ ...form, contact_name: e.target.value }))} placeholder="담당자 성함" /><Input aria-label="담당자 소속" value={editForm.contact_company} onChange={(e) => setEditForm((form) => ({ ...form, contact_company: e.target.value }))} placeholder="담당자 소속" /></div><DialogFooter><Button variant="outline" onClick={() => setEditVisitor(null)}>취소</Button><Button onClick={handleSaveEdit} disabled={savingEdit}>{savingEdit ? "저장 중..." : "저장"}</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={editVisitor !== null} onOpenChange={(open) => !open && setEditVisitor(null)}><DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>방문자 정보 수정</DialogTitle></DialogHeader><div className="grid gap-4 py-2"><Input aria-label="이름" value={editForm.name} onChange={(e) => setEditForm((form) => ({ ...form, name: e.target.value }))} placeholder="이름" /><Input aria-label="소속" value={editForm.company} onChange={(e) => setEditForm((form) => ({ ...form, company: e.target.value }))} placeholder="소속" /><FloorPicker value={editForm.floor} onChange={(floor) => setEditForm((form) => ({ ...form, floor }))} label="���업층 선택" /><Input aria-label="전화번호" value={editForm.phone} onChange={(e) => setEditForm((form) => ({ ...form, phone: e.target.value }))} placeholder="전화번호" /><label className="grid gap-2 text-sm font-medium">상태<select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={editForm.status} onChange={(e) => setEditForm((form) => ({ ...form, status: e.target.value as Visitor["status"] }))}><option value="pending">승인 대기</option><option value="onsite">재실 중</option><option value="exited">퇴실</option><option value="deleted">삭제</option></select></label><Input aria-label="담당자 성함" value={editForm.contact_name} onChange={(e) => setEditForm((form) => ({ ...form, contact_name: e.target.value }))} placeholder="담당자 성함" /><Input aria-label="담당자 소속" value={editForm.contact_company} onChange={(e) => setEditForm((form) => ({ ...form, contact_company: e.target.value }))} placeholder="담당자 소속" /></div><DialogFooter><Button variant="outline" onClick={() => setEditVisitor(null)}>취소</Button><Button onClick={handleSaveEdit} disabled={savingEdit}>{savingEdit ? "저장 중..." : "저장"}</Button></DialogFooter></DialogContent></Dialog>
 
       <Dialog open={floorVisitor !== null} onOpenChange={(open) => !open && setFloorVisitor(null)}><DialogContent><DialogHeader><DialogTitle>{floorVisitor ? `${floorVisitor.name} · 작업층` : "작업층"}</DialogTitle></DialogHeader>{floorVisitor && <FloorBadges value={floorVisitor.floor ?? ""} />}</DialogContent></Dialog>
 

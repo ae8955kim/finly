@@ -47,7 +47,7 @@ export function DeletedVisitorsTable({
 
       const { error } = await supabase
         .from("visitors")
-        .update({ status: "pending", deleted_at: null })
+        .update({ deleted_at: null })
         .eq("id", id)
 
       if (error) {
