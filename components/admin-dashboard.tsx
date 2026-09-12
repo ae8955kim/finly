@@ -166,7 +166,10 @@ export function AdminDashboard() {
           enteredDate <= selectedDate &&
           exitedDate > selectedDate
 
-        return isRegisteredOnSelectedDate || isUnexitedFromPreviousDay || isExitedAfterSelectedDate
+        const isExitedOnSelectedDate =
+          v.status === "exited" && exitedDate === selectedDate
+
+        return isRegisteredOnSelectedDate || isUnexitedFromPreviousDay || isExitedAfterSelectedDate || isExitedOnSelectedDate
       })
       .map((v) => {
         const enteredDate = getLocalDateString(v.enteredAt || v.entered_at)
@@ -197,25 +200,18 @@ export function AdminDashboard() {
         }
 
         if (v.status === "onsite") {
-          if (enteredDate !== "" && enteredDate < selectedDate) {
-            displayExitedAt = "명일 인계"
-          } else {
-            displayExitedAt = "-"
-          }
+          // 오늘 화면에서 아직 퇴실하지 않은 전날 입실자는 퇴실 시간이 비어 있어야 합니다.
+          displayExitedAt = "-"
         } else if (v.status === "exited" && rawExitedAt) {
-          if (exitedDate !== "" && exitedDate > selectedDate) {
-            displayExitedAt = "명일 인계"
-          } else {
-            try {
-              displayExitedAt = new Date(rawExitedAt).toLocaleTimeString("ko-KR", {
-                timeZone: "Asia/Seoul",
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-              })
-            } catch {
-              displayExitedAt = rawExitedAt
-            }
+          try {
+            displayExitedAt = new Date(rawExitedAt).toLocaleTimeString("ko-KR", {
+              timeZone: "Asia/Seoul",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            })
+          } catch {
+            displayExitedAt = rawExitedAt
           }
         }
 
