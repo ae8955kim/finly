@@ -34,7 +34,7 @@ export function VisitorForm({ onRegistered }: { onRegistered: (visitorId: string
       const { data: existing, error: existingError } = await supabase
         .from("visitors")
         .select("id, status")
-        .eq("phone", form.phone)
+        .eq("phone", form.phone.trim())
         .in("status", ["pending", "onsite"])
         .order("registered_at", { ascending: false })
         .limit(1)
@@ -43,6 +43,7 @@ export function VisitorForm({ onRegistered }: { onRegistered: (visitorId: string
       if (existingError) throw existingError
       if (existing?.id) {
         toast.info("이미 진행 중인 방문 신청이 있습니다. 기존 상태를 표시합니다.")
+        sessionStorage.setItem("visitorPhone", form.phone.trim())
         onRegistered(existing.id)
         return
       }
@@ -65,10 +66,16 @@ export function VisitorForm({ onRegistered }: { onRegistered: (visitorId: string
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        if (error.code === "23505") {
+          throw new Error("이미 등록되어 있는 번호입니다.")
+        }
+        throw error
+      }
       if (!data) throw new Error("등록에 실패했습니다.")
 
       toast.success("방문 신청이 완료되었습니다. 관리자 승인을 기다려주세요.")
+      sessionStorage.setItem("visitorPhone", form.phone.trim())
       onRegistered(data.id)
     } catch (err: any) {
       console.error("[Visitor Register Error]:", err)

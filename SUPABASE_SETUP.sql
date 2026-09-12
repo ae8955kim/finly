@@ -30,6 +30,10 @@ CREATE TABLE IF NOT EXISTS public.visitors (
 ALTER TABLE public.visitors ADD COLUMN IF NOT EXISTS contact_name TEXT;
 ALTER TABLE public.visitors ADD COLUMN IF NOT EXISTS contact_company TEXT;
 
+CREATE UNIQUE INDEX IF NOT EXISTS visitors_active_phone_unique
+  ON public.visitors (phone)
+  WHERE status IN ('pending', 'onsite');
+
 -- 테이블 설명 추가
 COMMENT ON TABLE public.visitors IS '방문자 출입 관리 테이블';
 COMMENT ON COLUMN public.visitors.id IS '고유 ID (UUID)';

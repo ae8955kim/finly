@@ -37,6 +37,10 @@ CREATE TABLE IF NOT EXISTS public.visitors (
 ALTER TABLE public.visitors ADD COLUMN IF NOT EXISTS contact_name TEXT;
 ALTER TABLE public.visitors ADD COLUMN IF NOT EXISTS contact_company TEXT;
 
+CREATE UNIQUE INDEX IF NOT EXISTS visitors_active_phone_unique
+  ON public.visitors (phone)
+  WHERE status IN ('pending', 'onsite');
+
 -- ============================================================================
 -- 2. CHAT_MESSAGES 테이블 - 양방향 채팅
 -- ============================================================================
