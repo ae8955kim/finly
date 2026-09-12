@@ -44,10 +44,18 @@ export function AdminDashboard() {
   const fetchVisitors = async () => {
     setError(null)
     try {
+      // 선택일의 KST 하루 범위만 조회하고, 선택일 이전에 입실해 아직 재실 중인 행은 함께 가져옵니다.
+      const dayStart = new Date(`${selectedDate}T00:00:00+09:00`)
+      const dayEnd = new Date(`${selectedDate}T00:00:00+09:00`)
+      dayEnd.setUTCDate(dayEnd.getUTCDate() + 1)
+      const startIso = dayStart.toISOString()
+      const endIso = dayEnd.toISOString()
+
       const { data: active, error: activeErr } = await supabase
         .from("visitors")
         .select("*")
         .neq("status", "deleted")
+        .or(`and(registered_at.gte.${startIso},registered_at.lt.${endIso}),and(status.eq.onsite,entered_at.lt.${endIso}),and(status.eq.exited,exited_at.gte.${startIso},exited_at.lt.${endIso}),and(status.eq.exited,entered_at.lt.${endIso},exited_at.gte.${endIso})`)
         .order("registered_at", { ascending: false })
 
       if (activeErr) throw activeErr
@@ -56,6 +64,8 @@ export function AdminDashboard() {
         .from("visitors")
         .select("*")
         .eq("status", "deleted")
+        .gte("deleted_at", startIso)
+        .lt("deleted_at", endIso)
         .order("registered_at", { ascending: false })
 
       if (deletedErr) throw deletedErr
@@ -93,7 +103,7 @@ export function AdminDashboard() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [supabase])
+  }, [supabase, selectedDate])
 
   useEffect(() => {
     let timerId: NodeJS.Timeout
@@ -200,9 +210,12 @@ export function AdminDashboard() {
         }
 
         if (v.status === "onsite") {
-          // 오늘 화면에서 아직 퇴실하지 않은 전날 입실자는 퇴실 시간이 비어 있어야 합니다.
-          displayExitedAt = "-"
+          // 입실일 뷰에는 다음 날로 이어졌음을 표시하고, 이후 날짜 뷰에서는 빈 값으로 표시합니다.
+          displayExitedAt = enteredDate === selectedDate ? "명일인계" : "-"
         } else if (v.status === "exited" && rawExitedAt) {
+          if (exitedDate > selectedDate && enteredDate === selectedDate) {
+            displayExitedAt = "명일인계"
+          } else {
           try {
             displayExitedAt = new Date(rawExitedAt).toLocaleTimeString("ko-KR", {
               timeZone: "Asia/Seoul",
@@ -212,6 +225,7 @@ export function AdminDashboard() {
             })
           } catch {
             displayExitedAt = rawExitedAt
+          }
           }
         }
 
