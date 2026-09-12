@@ -255,15 +255,18 @@ function VisitorRow({
             </>
           )}
           {visitor.status === "exited" && (
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={busy}
-              onClick={() => onAct(visitor.id, "delete")}
-              aria-label={`${visitor.name ?? "방문자"} 항목 삭제`}
-            >
-              <Trash2 className="size-4" />
-            </Button>
+            <>
+              <Button size="sm" variant="outline" disabled={busy} onClick={() => onOpenEdit(visitor)} aria-label={`${visitor.name ?? "방문자"} 정보 수정`}>수정하기</Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={busy}
+                onClick={() => onAct(visitor.id, "delete")}
+                aria-label={`${visitor.name ?? "방문자"} 항목 삭제`}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </>
           )}
         </div>
       </TableCell>
@@ -315,9 +318,9 @@ export function VisitorTable({
         contact_name: editForm.contact_name,
         contact_company: editForm.contact_company,
         status: editForm.status,
-        deleted_at: editForm.status === "deleted" ? editVisitor.deleted_at || now : null,
-        exited_at: editForm.status === "exited" || editForm.status === "deleted" ? editVisitor.exited_at || now : null,
-        entered_at: editForm.status === "onsite" ? editVisitor.entered_at || now : null,
+        deleted_at: editVisitor.deleted_at,
+        exited_at: editForm.status === "exited" ? editVisitor.exited_at || now : null,
+        entered_at: editVisitor.entered_at || null,
       }
       const { error } = await supabase.from("visitors").update(payload).eq("id", editVisitor.id)
       if (error) throw error
@@ -450,7 +453,7 @@ export function VisitorTable({
         </Table>
       </div>
 
-      <Dialog open={editVisitor !== null} onOpenChange={(open) => !open && setEditVisitor(null)}><DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>방문자 정보 수정</DialogTitle></DialogHeader><div className="grid gap-4 py-2"><Input aria-label="이름" value={editForm.name} onChange={(e) => setEditForm((form) => ({ ...form, name: e.target.value }))} placeholder="이름" /><Input aria-label="소속" value={editForm.company} onChange={(e) => setEditForm((form) => ({ ...form, company: e.target.value }))} placeholder="소속" /><FloorPicker value={editForm.floor} onChange={(floor) => setEditForm((form) => ({ ...form, floor }))} label="���업층 선택" /><Input aria-label="전화번호" value={editForm.phone} onChange={(e) => setEditForm((form) => ({ ...form, phone: e.target.value }))} placeholder="전화번호" /><label className="grid gap-2 text-sm font-medium">상태<select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={editForm.status} onChange={(e) => setEditForm((form) => ({ ...form, status: e.target.value as Visitor["status"] }))}><option value="pending">승인 대기</option><option value="onsite">재실 중</option><option value="exited">퇴실</option><option value="deleted">삭제</option></select></label><Input aria-label="담당자 성함" value={editForm.contact_name} onChange={(e) => setEditForm((form) => ({ ...form, contact_name: e.target.value }))} placeholder="담당자 성함" /><Input aria-label="담당자 소속" value={editForm.contact_company} onChange={(e) => setEditForm((form) => ({ ...form, contact_company: e.target.value }))} placeholder="담당자 소속" /></div><DialogFooter><Button variant="outline" onClick={() => setEditVisitor(null)}>취소</Button><Button onClick={handleSaveEdit} disabled={savingEdit}>{savingEdit ? "저장 중..." : "저장"}</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={editVisitor !== null} onOpenChange={(open) => !open && setEditVisitor(null)}><DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>방문자 정보 수정</DialogTitle></DialogHeader><div className="grid gap-4 py-2"><Input aria-label="이름" value={editForm.name} onChange={(e) => setEditForm((form) => ({ ...form, name: e.target.value }))} placeholder="이름" /><Input aria-label="소속" value={editForm.company} onChange={(e) => setEditForm((form) => ({ ...form, company: e.target.value }))} placeholder="소속" /><FloorPicker value={editForm.floor} onChange={(floor) => setEditForm((form) => ({ ...form, floor }))} label="���업층 선택" /><Input aria-label="전화번호" value={editForm.phone} onChange={(e) => setEditForm((form) => ({ ...form, phone: e.target.value }))} placeholder="전화번호" /><label className="grid gap-2 text-sm font-medium">상태<select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={editForm.status} onChange={(e) => setEditForm((form) => ({ ...form, status: e.target.value as Visitor["status"] }))}><option value="pending">승인 대기</option><option value="onsite">재실</option><option value="exited">퇴실</option></select></label><Input aria-label="담당자 성함" value={editForm.contact_name} onChange={(e) => setEditForm((form) => ({ ...form, contact_name: e.target.value }))} placeholder="담당자 성함" /><Input aria-label="담당자 소속" value={editForm.contact_company} onChange={(e) => setEditForm((form) => ({ ...form, contact_company: e.target.value }))} placeholder="담당자 소속" /></div><DialogFooter><Button variant="outline" onClick={() => setEditVisitor(null)}>취소</Button><Button onClick={handleSaveEdit} disabled={savingEdit}>{savingEdit ? "저장 중..." : "저장"}</Button></DialogFooter></DialogContent></Dialog>
 
       <Dialog open={floorVisitor !== null} onOpenChange={(open) => !open && setFloorVisitor(null)}><DialogContent><DialogHeader><DialogTitle>{floorVisitor ? `${floorVisitor.name} · 작업층` : "작업층"}</DialogTitle></DialogHeader>{floorVisitor && <FloorBadges value={floorVisitor.floor ?? ""} />}</DialogContent></Dialog>
 
